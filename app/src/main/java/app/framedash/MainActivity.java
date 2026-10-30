@@ -1,0 +1,420 @@
+package app.framedash;
+
+import android.content.Context;
+import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.View;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/** The home screen: clock, today's brief, and the dock with the ChatGPT button. */
+public class MainActivity extends BaseActivity {
+
+    private final ExecutorService bg = Executors.newSingleThreadExecutor();
+    private final Handler main = new Handler(Looper.getMainLooper());
+
+    private View root;
+    private ImageView wallpaper;
+    private TextView creditText;
+    private ImageView wifiIcon;
+    private UpdateFlow updates;
+    private ConnectivityManager cm;
+    private ConnectivityManager.NetworkCallback netCallback;
+    private int loadedW, loadedH;
+    private BriefView briefView;
+    private Brief brief;
+    private boolean briefBusy;
+    private static final long BRIEF_REFRESH_MS = 2 * 60 * 1000;
+    private final Runnable briefTimer = new Runnable() {
+        @Override public void run() {
+            refreshBrief();
+            main.postDelayed(this, BRIEF_REFRESH_MS);
+        }
+    };
+    private boolean wallpaperBusy;
+    private TextView weatherIcon, weatherTemp, weatherSub;
+    private Presence presence;
+    private Bindings.Watcher gestures;
+    private long lastActivity = System.currentTimeMillis();
+    private final Runnable idleCheck = new Runnable() {
+        @Override public void run() {
+            int idle = Prefs.artIdleMin(MainActivity.this);
+            if (idle > 0 && System.currentTimeMillis() - lastActivity > idle * 60_000L) {
+                startActivity(new Intent(MainActivity.this, ArtActivity.class));
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+                return;
+            }
+            main.postDelayed(this, 10_000);
+        }
+    };
+    private boolean weatherBusy;
+    private static final long WEATHER_CHECK_MS = 10 * 60 * 1000;
+    private final Runnable weatherTimer = new Runnable() {
+        @Override public void run() {
+            refreshWeather(false);
+            main.postDelayed(this, WEATHER_CHECK_MS);
+        }
+    };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        root = findViewById(R.id.root);
+        wallpaper = findViewById(R.id.wallpaper);
+        creditText = findViewById(R.id.creditText);
+        wifiIcon = findViewById(R.id.wifiIcon);
+        weatherIcon = findViewById(R.id.weatherIcon);
+        weatherTemp = findViewById(R.id.weatherTemp);
+        weatherSub = findViewById(R.id.weatherSub);
+        findViewById(R.id.weatherCard).setOnClickListener(v ->
+                startActivity(new Intent(this, WeatherActivity.class)));
+
+        findViewById(R.id.btnSettings).setOnClickListener(v ->
+                startActivity(new Intent(this, SettingsActivity.class)));
+        findViewById(R.id.dockFridge).setOnClickListener(v -> FridgeHome.open(this));
+        findViewById(R.id.dockHome).setOnClickListener(v -> openHomeAssistant());
+        findViewById(R.id.dockTalk).setOnClickListener(v ->
+                startActivity(new Intent(this, VoiceActivity.class)));
+        findViewById(R.id.dockCalendar).setOnClickListener(v ->
+                Ui.start(this, new Intent(Intent.ACTION_VIEW, Uri.parse("https://calendar.google.com/calendar/r/day"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+        findViewById(R.id.dockApps).setOnClickListener(v ->
+                startActivity(new Intent(this, AppsActivity.class)));
+
+        briefView = new BriefView(this, findViewById(R.id.todayColumn));
+        briefView.setListener(this::syncToggle);
+
+        View bannerBox = findViewById(R.id.updateBannerBox);
+        updates = new UpdateFlow(this, bg, findViewById(R.id.updateBanner), bannerBox, null);
+
+        // Size is known after the first layout; load the wallpaper then (and when it changes).
+        root.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (v.getWidth() != loadedW || v.getHeight() != loadedH) loadWallpaper();
+            fitContent(v.getWidth(), v.getHeight());
+        });
+
+        presence = new Presence(this, () -> lastActivity = System.currentTimeMillis());
+        gestures = new Bindings.Watcher(this, this::perform);
+        cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        watchNetwork();
+        Tools.warmUp(this);                // finds the home city once, for weather questions
+        RemoteMic.get(this).startServer(); // lets a phone be the microphone (Settings → Phone as microphone)
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Glass.setRoot(root);
+        updateNetwork();
+        updates.autoCheck();
+        if (loadedW > 0) loadWallpaper(); // picks up a setting change
+        if (Wallpaper.refreshDue(this)) refreshWallpaper();
+        showBrief(null);
+        main.removeCallbacks(briefTimer);
+        main.post(briefTimer);
+        showWeather(Weather.cached(this));
+        main.removeCallbacks(weatherTimer);
+        main.post(weatherTimer);
+        // Art mode: keep the screen on (paintings replace the screen going dark) and watch for idleness.
+        lastActivity = System.currentTimeMillis();
+        boolean art = Prefs.artIdleMin(this) > 0;
+        if (art) getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        main.removeCallbacks(idleCheck);
+        gestures.start();
+        if (art) {
+            presence.start();
+            main.postDelayed(idleCheck, 10_000);
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration c) {
+        super.onConfigurationChanged(c);
+        showBrief(null); // one column in portrait, two in landscape
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        lastActivity = System.currentTimeMillis();
+        return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent ev) {
+        lastActivity = System.currentTimeMillis();
+        String bound = Bindings.actionForKey(this, ev);
+        if (bound != null) {
+            if (ev.getAction() == android.view.KeyEvent.ACTION_DOWN && ev.getRepeatCount() == 0) perform(bound);
+            return true;
+        }
+        return super.dispatchKeyEvent(ev);
+    }
+
+    @Override
+    public boolean dispatchGenericMotionEvent(android.view.MotionEvent ev) {
+        lastActivity = System.currentTimeMillis();
+        String dir = Bindings.motionDir(ev);
+        String bound = dir == null ? null : Bindings.actionForMotion(this, ev, dir);
+        if (bound != null) { perform(bound); return true; }
+        return super.dispatchGenericMotionEvent(ev);
+    }
+
+    /** A learned button or gesture on the dashboard: pictures/albums open art mode, the rest do what they say. */
+    private void perform(String action) {
+        lastActivity = System.currentTimeMillis();
+        switch (action) {
+            case Bindings.DASHBOARD:
+                break; // already here
+            case Bindings.CHATGPT:
+                startActivity(new Intent(this, VoiceActivity.class));
+                break;
+            default:
+                startActivity(new Intent(this, ArtActivity.class));
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        main.removeCallbacks(briefTimer);
+        main.removeCallbacks(weatherTimer);
+        main.removeCallbacks(idleCheck);
+        presence.stop();
+        gestures.stop();
+    }
+
+    /** On a landscape screen (e.g. a picture frame), keep the dashboard a readable centred column. */
+    private void fitContent(int w, int h) {
+        View content = findViewById(R.id.content);
+        int max = Ui.dp(this, 1000); // landscape: two columns of cards
+        int side = w > h && w > max ? (w - max) / 2 : Ui.dp(this, 24);
+        if (content.getPaddingStart() != side) {
+            content.post(() -> content.setPaddingRelative(side, content.getPaddingTop(), side, content.getPaddingBottom()));
+        }
+    }
+
+    // ------------------------------------------------------------------ weather
+
+    private void showWeather(Weather w) {
+        if (w == null) {
+            weatherIcon.setText("⛅");
+            weatherTemp.setText("—°");
+            weatherSub.setText("Loading weather…");
+            return;
+        }
+        weatherIcon.setText(Weather.icon(w.code, w.isDay));
+        weatherTemp.setText(w.temp + "°");
+        weatherSub.setText(w.shortPlace() + " · " + w.todayMax + "° / " + w.todayMin + "°"
+                + (w.todayRain >= 30 ? " · ☂ " + w.todayRain + "%" : ""));
+    }
+
+    private void refreshWeather(boolean force) {
+        Weather c = Weather.cached(this);
+        if (weatherBusy || (!force && c != null && !c.stale())) return;
+        weatherBusy = true;
+        final Context app = getApplicationContext();
+        bg.execute(() -> {
+            Weather w = null;
+            try { w = Weather.fetch(app); } catch (Exception ignored) {}
+            final Weather fw = w;
+            main.post(() -> {
+                weatherBusy = false;
+                if (isDestroyed()) return;
+                if (fw != null) showWeather(fw);
+                else if (c == null) weatherSub.setText("Weather: tap for details");
+            });
+        });
+    }
+
+    // ------------------------------------------------------------------ daily brief
+
+    private void showBrief(String status) {
+        if (brief == null) brief = Brief.cached(this);
+        if (brief != null) {
+            briefView.show(brief, status);
+        } else if (!Brief.configured(this)) {
+            briefView.showMessage("Today", "Your daily brief will appear here. Connect it in Settings → Daily brief.");
+        } else {
+            briefView.showMessage("Today", status != null ? status : "Loading your daily brief…");
+        }
+    }
+
+    /** Writes a check-off to Notion; on failure, undoes it on screen. */
+    private void syncToggle(Brief b, Brief.Item it, boolean done) {
+        if (!Notion.configured(this)) return;
+        if (it.pageId.isEmpty()) {
+            // Still showing the old file-based brief: say so instead of failing silently.
+            b.setDone(this, it, !done);
+            briefView.show(b, "loading from Notion…");
+            Toast.makeText(this, "Still loading your list from Notion. Try again in a moment.", Toast.LENGTH_LONG).show();
+            brief = null;
+            refreshBrief();
+            return;
+        }
+        final android.content.Context app = getApplicationContext();
+        bg.execute(() -> {
+            String err = null;
+            try {
+                Notion.setDone(app, it.pageId, done);
+                try (java.io.FileOutputStream out = new java.io.FileOutputStream(Brief.cacheFile(app))) {
+                    out.write(b.toJson().getBytes("UTF-8"));
+                }
+            } catch (Throwable e) {
+                err = e.getClass().getSimpleName() + ": " + e.getMessage();
+            }
+            final String e = err;
+            if (e == null) main.post(() -> {
+                if (!isDestroyed()) Toast.makeText(this, done ? "✓ Done in Notion" : "Reopened in Notion", Toast.LENGTH_SHORT).show();
+            });
+            if (e != null) main.post(() -> {
+                if (isDestroyed()) return;
+                b.setDone(app, it, !done);
+                briefView.show(b, "not saved");
+                Toast.makeText(this, "Couldn't update Notion: " + e, Toast.LENGTH_LONG).show();
+            });
+        });
+    }
+
+    private void refreshBrief() {
+        if (briefBusy || !Brief.configured(this)) return;
+        briefBusy = true;
+        final android.content.Context app = getApplicationContext();
+        bg.execute(() -> {
+            Brief fresh = null;
+            String err = null;
+            try {
+                fresh = Brief.load(app);
+            } catch (Exception e) {
+                err = e.getMessage();
+            }
+            final Brief f = fresh;
+            final String e = err;
+            main.post(() -> {
+                briefBusy = false;
+                if (isDestroyed()) return;
+                if (f != null) brief = f;
+                String when = new java.text.SimpleDateFormat("H:mm", java.util.Locale.US).format(new java.util.Date());
+                showBrief(e == null ? "updated " + when
+                        : (brief != null ? "offline copy (" + e + ")" : "Couldn't load: " + e));
+            });
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (cm != null && netCallback != null) {
+            try { cm.unregisterNetworkCallback(netCallback); } catch (Exception ignored) {}
+        }
+        bg.shutdownNow();
+    }
+
+    @Override
+    public void onBackPressed() {
+        // This is a home screen: Back does nothing rather than closing it.
+    }
+
+    private void openHomeAssistant() {
+        for (String pkg : Apps.PKG_HOME_ASSISTANT) {
+            AppEntry e = Apps.entryForPackage(getPackageManager(), pkg, null);
+            if (e != null) { Ui.start(this, e.intent); return; }
+        }
+        Toast.makeText(this, "Home Assistant app isn't installed", Toast.LENGTH_SHORT).show();
+    }
+
+    // ------------------------------------------------------------------ wallpaper
+
+    private void loadWallpaper() {
+        final int w = root.getWidth(), h = root.getHeight();
+        if (w <= 0 || h <= 0 || wallpaperBusy) return;
+        wallpaperBusy = true;
+        final Context app = getApplicationContext();
+        bg.execute(() -> {
+            Wallpaper.Images imgs = null;
+            try {
+                imgs = Wallpaper.load(app, w, h);
+            } catch (Throwable ignored) {
+                // Out of memory or a bad file: keep the plain background.
+            }
+            final Wallpaper.Images fImgs = imgs;
+            main.post(() -> {
+                wallpaperBusy = false;
+                if (isDestroyed() || fImgs == null || fImgs.sharp == null) return;
+                loadedW = w;
+                loadedH = h;
+                wallpaper.setImageBitmap(fImgs.sharp);
+                Glass.setBackdrop(fImgs.blurred);
+                showCredit(fImgs.credit);
+            });
+        });
+    }
+
+    private void refreshWallpaper() {
+        final Context app = getApplicationContext();
+        bg.execute(() -> {
+            boolean changed;
+            try {
+                changed = Wallpaper.refresh(app);
+            } catch (Exception e) {
+                changed = false; // offline or Bing unreachable: keep yesterday's photo
+            }
+            if (changed) main.post(this::loadWallpaper);
+        });
+    }
+
+    private void showCredit(String credit) {
+        if (credit == null || credit.isEmpty()) {
+            creditText.setText(Prefs.dailyWallpaper(this) ? "Photo of the day loads with Wi-Fi" : "FridgeDash");
+        } else {
+            // "Title · Place (© Photographer/Agency)": keep it short for the chip.
+            int paren = credit.indexOf(" (©");
+            creditText.setText(paren > 0 ? credit.substring(0, paren) : credit);
+        }
+    }
+
+    // ------------------------------------------------------------------ network
+
+    private void watchNetwork() {
+        if (cm == null) return;
+        netCallback = new ConnectivityManager.NetworkCallback() {
+            @Override public void onAvailable(Network n) {
+                main.post(() -> {
+                    updateNetwork();
+                    refreshBrief();
+                    refreshWeather(false);
+                    if (Wallpaper.refreshDue(MainActivity.this)) refreshWallpaper();
+                });
+            }
+            @Override public void onLost(Network n) { main.post(MainActivity.this::updateNetwork); }
+        };
+        try {
+            cm.registerDefaultNetworkCallback(netCallback);
+        } catch (Exception e) {
+            netCallback = null;
+        }
+    }
+
+    private void updateNetwork() {
+        if (cm == null) return;
+        Network n = cm.getActiveNetwork();
+        NetworkCapabilities caps = n == null ? null : cm.getNetworkCapabilities(n);
+        boolean online = caps != null;
+        wifiIcon.setColorFilter(online ? 0xFF5ED3C4 : 0xFFF0A44B);
+        wifiIcon.setAlpha(online ? 1f : 0.6f);
+        wifiIcon.setContentDescription(online ? "Wi-Fi connected" : "Offline");
+    }
+}

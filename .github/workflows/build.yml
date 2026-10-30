@@ -1,0 +1,81 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      FRIDGEDASH_KEYSTORE_PASSWORD: ${{ secrets.FRIDGEDASH_KEYSTORE_PASSWORD }}
+    steps:
+      - name: Check signing secret
+        run: |
+          if [ -z "$FRIDGEDASH_KEYSTORE_PASSWORD" ]; then
+            echo "::error::Missing secret FRIDGEDASH_KEYSTORE_PASSWORD (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build signed release APK
+        run: |
+          set -o pipefail
+          # Compiler errors become annotations, readable without downloading logs.
+          gradle --no-daemon assembleRelease 2>&1 | tee build.log || {
+            grep -E "error:|\.java:[0-9]+:" build.log | head -20 | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          }
+
+      - name: Prepare release files
+        run: |
+          META=app/build/outputs/apk/release/output-metadata.json
+          VERSION_NAME=$(jq -r '.elements[0].versionName' "$META")
+          VERSION_CODE=$(jq -r '.elements[0].versionCode' "$META")
+          TAG="v${VERSION_NAME}"
+          mkdir out
+          cp app/build/outputs/apk/release/app-release.apk out/framedash.apk
+          # Same file with a .jpg name, for the fridge's Bluetooth photo transfer.
+          cp out/framedash.apk out/framedash.jpg
+          SHA=$(sha256sum out/framedash.apk | cut -d' ' -f1)
+          SIZE=$(stat -c %s out/framedash.apk)
+          NOTES=$(git log -1 --pretty=%s)
+          jq -n \
+            --argjson code "$VERSION_CODE" \
+            --arg name "$VERSION_NAME" \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/framedash.apk" \
+            --arg sha "$SHA" \
+            --argjson size "$SIZE" \
+            --arg notes "$NOTES" \
+            '{versionCode:$code, versionName:$name, apkUrl:$url, sha256:$sha, size:$size, notes:$notes}' \
+            > out/version.json
+          cat out/version.json
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "NOTES=$NOTES" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" out/framedash.apk out/framedash.jpg out/version.json \
+            --title "FrameDash ${VERSION_NAME}" \
+            --notes "${NOTES}
+
+          On the frame: FrameDash → Update (installs over Wi-Fi).
+          First install / fallback: send fridgedash.jpg to the fridge via Bluetooth (My Apps → Album → +), rename to .apk, install." \
+            --latest
