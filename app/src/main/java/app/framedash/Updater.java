@@ -35,7 +35,7 @@ final class Updater {
     private Updater() {}
 
     static final String VERSION_URL =
-            "https://github.com/armadocs/framedash/releases/latest/download/version.json";
+            "https://github.com/armadocs/Lenovo_Frame/releases/latest/download/version.json";
 
     private static final String PREFS = "fridgedash";
     private static final String KEY_LAST_CHECK = "update_last_check";
