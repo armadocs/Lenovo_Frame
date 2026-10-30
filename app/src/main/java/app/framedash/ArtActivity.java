@@ -183,7 +183,12 @@ public class ArtActivity extends BaseActivity implements Presence.Listener {
                         r = Art.next(app, w, h, avoid);
                     } else {
                         Photos.Album album = Photos.album(app, col, false);
-                        r = Art.pickFrom(album.items, w, h, avoid);
+                        try {
+                            r = Art.pickFrom(album.items, w, h, avoid);
+                        } catch (java.io.IOException none) {
+                            // The album has nothing in this orientation: show paintings instead of borders.
+                            r = Art.next(app, w, h, avoid);
+                        }
                     }
                 } else {
                     StringBuilder errs = new StringBuilder();
@@ -216,9 +221,8 @@ public class ArtActivity extends BaseActivity implements Presence.Listener {
 
     private void show(Art.Piece p, Bitmap bmp, Bitmap matte) {
         int back = 1 - front;
-        // Shaped like the screen: fill it edge to edge (a little trimmed). Otherwise show it whole on a matte.
-        double screen = root.getWidth() / (double) Math.max(1, root.getHeight());
-        boolean fill = Art.fits(bmp.getWidth() / (double) bmp.getHeight(), screen);
+        // Only pictures with the screen's orientation are picked, so always fill edge to edge: no borders.
+        boolean fill = true;
         arts[back].setScaleType(fill ? ImageView.ScaleType.CENTER_CROP : ImageView.ScaleType.FIT_CENTER);
         int pad = fill ? 0 : Ui.dp(this, 26);
         arts[back].setPadding(pad, pad, pad, fill ? 0 : Ui.dp(this, 48));

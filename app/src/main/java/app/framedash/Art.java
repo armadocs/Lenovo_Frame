@@ -231,15 +231,12 @@ final class Art {
     /** Picks a random item shaped like the screen from any collection (paintings or a photo album). */
     static Object[] pickFrom(List<Piece> everything, int w, int h, String avoid) throws Exception {
         if (everything.isEmpty()) throw new IOException("nothing to show");
-        // Only paintings shaped like the screen; if there are too few, at least the same orientation.
-        double screen = w / (double) h;
+        // Only pictures with the screen's orientation, so they always fill it without borders.
+        // Near-square pictures are left out too: filling the screen would cut off too much.
+        boolean wide = w >= h;
         List<Piece> all = new ArrayList<>();
-        for (Piece p : everything) if (fits(p.ratio, screen)) all.add(p);
-        if (all.size() < 8) {
-            all.clear();
-            for (Piece p : everything) if (p.ratio > 0 && (p.ratio > 1) == (screen > 1)) all.add(p);
-        }
-        if (all.isEmpty()) all = everything;
+        for (Piece p : everything) if (wide ? p.ratio >= 1.2 : p.ratio > 0 && p.ratio <= 1 / 1.2) all.add(p);
+        if (all.isEmpty()) throw new IOException("no " + (wide ? "landscape" : "portrait") + " pictures here");
         StringBuilder errs = new StringBuilder();
         for (int attempt = 0; attempt < 8; attempt++) {
             Piece p = all.get(rnd.nextInt(all.size()));
