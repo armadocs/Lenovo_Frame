@@ -101,14 +101,10 @@ public class ArtActivity extends BaseActivity implements Presence.Listener {
     protected void onResume() {
         super.onResume();
         startedAt = System.currentTimeMillis();
-        if (Prefs.artGesturesWake(this)) {
-            // Anyone walking up, waving or pressing a button brings the dashboard back.
-            presence.start(true);
-        } else {
-            // Gestures change pictures; the proximity sensor still wakes unless it carries those gestures.
-            if (!Bindings.usesSensorType(this, android.hardware.Sensor.TYPE_PROXIMITY)) presence.start();
-            gestures.start();
-        }
+        Desks.current = Desks.ART;
+        // Walking up brings the dashboard back; learned sensor gestures still work.
+        if (!Bindings.usesSensorType(this, android.hardware.Sensor.TYPE_PROXIMITY)) presence.start(true);
+        gestures.start();
         main.removeCallbacks(rotate);
         main.post(rotate);
     }
@@ -257,83 +253,58 @@ public class ArtActivity extends BaseActivity implements Presence.Listener {
 
     @Override
     public void onSomeoneNear() {
-        if (System.currentTimeMillis() - startedAt > 2000) wake(); // ignore the moments right after it opened
+        // Ignore the moments right after it opened; then only if art came up by itself or nobody used it lately.
+        if (System.currentTimeMillis() - startedAt > 2000 && Desks.presenceShouldReturn(this)) wake();
     }
 
-    @Override public boolean dispatchTouchEvent(MotionEvent ev) { wake(); return true; }
+    @Override public boolean dispatchTouchEvent(MotionEvent ev) { Desks.human(); wake(); return true; }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent ev) {
-        if (Prefs.artGesturesWake(this)) {
-            if (ev.getAction() == KeyEvent.ACTION_DOWN) { startedAt = 0; wake(); }
-            return true;
-        }
         String bound = Bindings.actionForKey(this, ev);
+        int k = ev.getKeyCode();
+        if (bound == null) {
+            // Keyboard arrows behave like the gestures.
+            if (k == KeyEvent.KEYCODE_DPAD_LEFT) bound = Bindings.GO_LEFT;
+            else if (k == KeyEvent.KEYCODE_DPAD_RIGHT) bound = Bindings.GO_RIGHT;
+            else if (k == KeyEvent.KEYCODE_DPAD_UP || k == KeyEvent.KEYCODE_PAGE_UP) bound = Bindings.UP;
+            else if (k == KeyEvent.KEYCODE_DPAD_DOWN || k == KeyEvent.KEYCODE_PAGE_DOWN) bound = Bindings.DOWN;
+        }
         if (bound != null) {
             if (ev.getAction() == KeyEvent.ACTION_DOWN && ev.getRepeatCount() == 0) perform(bound);
             return true;
         }
-        // Arrow keys (and gestures, once mapped to them) flip through paintings without leaving art mode.
-        int k = ev.getKeyCode();
-        boolean next = k == KeyEvent.KEYCODE_DPAD_RIGHT || k == KeyEvent.KEYCODE_PAGE_DOWN || k == KeyEvent.KEYCODE_MEDIA_NEXT;
-        boolean prev = k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_PAGE_UP || k == KeyEvent.KEYCODE_MEDIA_PREVIOUS;
-        boolean up = k == KeyEvent.KEYCODE_DPAD_UP, down = k == KeyEvent.KEYCODE_DPAD_DOWN;
-        if (up || down) {
-            if (ev.getAction() == KeyEvent.ACTION_DOWN && ev.getRepeatCount() == 0) {
-                startedAt = System.currentTimeMillis();
-                main.removeCallbacks(rotate);
-                switchCollection(down ? 1 : -1);
-                main.postDelayed(rotate, Prefs.artIntervalMin(this) * 60_000L);
-            }
-            return true;
-        }
-        if (next || prev) {
-            if (ev.getAction() == KeyEvent.ACTION_DOWN && ev.getRepeatCount() == 0) {
-                startedAt = System.currentTimeMillis();
-                main.removeCallbacks(rotate);
-                if (next) loadNext(); else loadPrevious();
-                main.postDelayed(rotate, Prefs.artIntervalMin(this) * 60_000L);
-            }
-            return true;
-        }
-        wake();
+        if (ev.getAction() == KeyEvent.ACTION_DOWN) { Desks.human(); wake(); }
         return true;
     }
 
-    /** A learned button or gesture (Settings → Gestures & buttons). */
+    /** Left goes back to the dashboard; up/down change the picture. */
     private void perform(String action) {
+        Desks.human();
+        Desks.artFromIdle = false;
         startedAt = System.currentTimeMillis();
         switch (action) {
-            case Bindings.NEXT: case Bindings.PREV:
+            case Bindings.UP: case Bindings.DOWN:
                 main.removeCallbacks(rotate);
-                if (Bindings.NEXT.equals(action)) loadNext(); else loadPrevious();
+                if (Bindings.DOWN.equals(action)) loadNext(); else loadPrevious();
                 main.postDelayed(rotate, Prefs.artIntervalMin(this) * 60_000L);
                 break;
-            case Bindings.ALBUM_NEXT: case Bindings.ALBUM_PREV:
-                main.removeCallbacks(rotate);
-                switchCollection(Bindings.ALBUM_NEXT.equals(action) ? 1 : -1);
-                main.postDelayed(rotate, Prefs.artIntervalMin(this) * 60_000L);
-                break;
-            case Bindings.DASHBOARD:
+            case Bindings.GO_LEFT: case Bindings.DASHBOARD:
                 startedAt = 0;
                 wake();
                 break;
             default:
-                break; // "Show art": already showing
+                break; // right: nothing further right
         }
     }
 
     @Override
     public boolean dispatchGenericMotionEvent(MotionEvent ev) {
-        if (Prefs.artGesturesWake(this)) {
-            if (System.currentTimeMillis() - startedAt > 1500) wake();
-            return true;
-        }
         String dir = Bindings.motionDir(ev);
         String bound = dir == null ? null : Bindings.actionForMotion(this, ev, dir);
         if (bound != null) { perform(bound); return true; }
         // Mouse movement; ignore the first moments so the click that opened art mode doesn't close it.
-        if (System.currentTimeMillis() - startedAt > 1500) wake();
+        if (System.currentTimeMillis() - startedAt > 1500) { Desks.human(); wake(); }
         return true;
     }
 }

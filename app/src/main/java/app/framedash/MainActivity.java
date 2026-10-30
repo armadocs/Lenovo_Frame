@@ -50,6 +50,8 @@ public class MainActivity extends BaseActivity {
         @Override public void run() {
             int idle = Prefs.artIdleMin(MainActivity.this);
             if (idle > 0 && System.currentTimeMillis() - lastActivity > idle * 60_000L) {
+                Desks.current = Desks.ART;
+                Desks.artFromIdle = true;
                 startActivity(new Intent(MainActivity.this, ArtActivity.class));
                 overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
                 return;
@@ -113,6 +115,7 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        Desks.current = Desks.DASHBOARD;
         Glass.setRoot(root);
         updateNetwork();
         updates.autoCheck();
@@ -146,6 +149,7 @@ public class MainActivity extends BaseActivity {
     @Override
     public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
         lastActivity = System.currentTimeMillis();
+        Desks.human();
         return super.dispatchTouchEvent(ev);
     }
 
@@ -169,19 +173,29 @@ public class MainActivity extends BaseActivity {
         return super.dispatchGenericMotionEvent(ev);
     }
 
-    /** A learned button or gesture on the dashboard: pictures/albums open art mode, the rest do what they say. */
+    /** A learned button or gesture on the dashboard: left/right switch desktops, up/down scroll the list. */
     private void perform(String action) {
         lastActivity = System.currentTimeMillis();
+        Desks.human();
         switch (action) {
-            case Bindings.DASHBOARD:
-                break; // already here
-            default:
-                showArt();
+            case Bindings.GO_LEFT: Desks.left(this); break;
+            case Bindings.GO_RIGHT: Desks.right(this); break;
+            case Bindings.UP: scrollBrief(-1); break;
+            case Bindings.DOWN: scrollBrief(1); break;
+            default: break; // "dashboard": already here
         }
     }
 
+    /** Moves the to-do list by most of a screen; does nothing when it all fits. */
+    private void scrollBrief(int dir) {
+        android.widget.ScrollView sv = findViewById(R.id.todayScroll);
+        if (sv == null) return;
+        sv.smoothScrollBy(0, dir * (int) (sv.getHeight() * 0.7f));
+    }
+
     private void showArt() {
-        startActivity(new Intent(this, ArtActivity.class));
+        Desks.human();
+        Desks.show(this, Desks.ART);
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
     }
 

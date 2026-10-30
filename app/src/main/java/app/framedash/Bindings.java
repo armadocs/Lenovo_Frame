@@ -28,17 +28,25 @@ import java.util.Map;
 final class Bindings {
     private Bindings() {}
 
-    static final String NEXT = "next", PREV = "prev", ALBUM_NEXT = "album_next", ALBUM_PREV = "album_prev",
-            DASHBOARD = "dashboard", ART = "art";
+    /*
+     * Desktops, left to right: [left app, e.g. Fotoo]  [dashboard]  [art / photos].
+     * Left/right always switch desktops; up/down scroll the dashboard or change the picture.
+     */
+    static final String GO_LEFT = "go_left", GO_RIGHT = "go_right", UP = "up", DOWN = "down",
+            DASHBOARD = "dashboard";
 
     static final String[][] ACTIONS = {
-            {NEXT, "Next picture"},
-            {PREV, "Previous picture"},
-            {ALBUM_NEXT, "Next album"},
-            {ALBUM_PREV, "Previous album"},
-            {DASHBOARD, "Show the dashboard"},
-            {ART, "Show art / photos"},
+            {GO_LEFT, "Left desktop (towards Fotoo)"},
+            {GO_RIGHT, "Right desktop (towards Art)"},
+            {UP, "Up: scroll up / previous picture"},
+            {DOWN, "Down: scroll down / next picture"},
+            {DASHBOARD, "Straight to the dashboard (e.g. the ☆ button)"},
     };
+
+    static boolean known(String action) {
+        for (String[] a : ACTIONS) if (a[0].equals(action)) return true;
+        return false;
+    }
 
     static String label(String action) {
         for (String[] a : ACTIONS) if (a[0].equals(action)) return a[1];
@@ -49,7 +57,13 @@ final class Bindings {
 
     private static JSONObject all(Context c) {
         try {
-            return new JSONObject(Prefs.raw(c).getString("bindings", "{}"));
+            JSONObject a = new JSONObject(Prefs.raw(c).getString("bindings", "{}"));
+            // Actions from older versions (next/previous picture, albums) no longer exist.
+            List<String> old = new ArrayList<>();
+            Iterator<String> it = a.keys();
+            while (it.hasNext()) { String k = it.next(); if (!known(k)) old.add(k); }
+            for (String k : old) a.remove(k);
+            return a;
         } catch (Exception e) {
             return new JSONObject();
         }

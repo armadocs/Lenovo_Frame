@@ -37,7 +37,7 @@ public class SettingsActivity extends BaseActivity {
     private TextView notionStatus;
     private TextView artIdleButton, artIntervalButton, orientButton, albumsStatus, collectionButton;
     private EditText albumsField;
-    private TextView wallButton, sizeButton, updateStatus;
+    private TextView wallButton, sizeButton, updateStatus, leftAppButton, serviceButton;
     private UpdateFlow updates;
 
     @Override
@@ -175,22 +175,7 @@ public class SettingsActivity extends BaseActivity {
             refreshArt();
         }, false);
         col.addView(collectionButton, full());
-        col.addView(note("On the frame: ← → change the picture, ↑ ↓ switch between your albums and the paintings."));
         col.addView(button("Show art now", v -> startActivity(new Intent(this, ArtActivity.class)), true), full());
-        col.addView(button("Gestures & buttons (teach what each one does)",
-                v -> startActivity(new Intent(this, GestureSetupActivity.class)), true), full());
-        col.addView(button("Sensor details (for troubleshooting)",
-                v -> startActivity(new Intent(this, GestureTestActivity.class)), false), full());
-        TextView wakeButton = button("", null, false);
-        Runnable refreshWake = () -> wakeButton.setText(Prefs.artGesturesWake(this)
-                ? "In art mode, gestures & buttons: show the dashboard"
-                : "In art mode, gestures & buttons: change pictures / albums");
-        wakeButton.setOnClickListener(v -> {
-            Prefs.setArtGesturesWake(this, !Prefs.artGesturesWake(this));
-            refreshWake.run();
-        });
-        refreshWake.run();
-        col.addView(wakeButton, full());
         TextView shadowButton = button("", null, false);
         String[] shadowNames = {"off", "low", "medium", "high"};
         Runnable refreshShadow = () -> shadowButton.setText("Walk-up detection (light sensor): "
@@ -205,12 +190,28 @@ public class SettingsActivity extends BaseActivity {
                 + "Higher reacts sooner but may also react when a lamp is switched off."));
         String sensor = Presence.describe(this);
         int learned = Bindings.boundSensors(this).size();
-        col.addView(note("Show the dashboard: someone coming close, any wave or any button ends art mode. "
-                + "Change pictures: your gestures flip pictures and albums instead. Sensors watched: "
+        col.addView(note("Sensors watched for someone walking up: "
                 + (sensor.isEmpty() ? "" : "proximity (" + sensor + ")")
                 + (learned > 0 ? (sensor.isEmpty() ? "" : " + ") + learned + " gesture sensor(s)" : "")
                 + (sensor.isEmpty() && learned == 0 ? "none yet (record a gesture first)" : "") + "."));
         refreshArt();
+
+        // ---------------------------------------------------------- Desktops
+        section("Desktops & gestures");
+        col.addView(note("Three desktops, left to right: " + "the left app · the dashboard · art & photos. "
+                + "Left/right gestures switch desktops, up/down scroll the dashboard or change the picture. "
+                + "Walking up brings back the dashboard unless someone used the frame in the last few minutes."));
+        leftAppButton = button("", v -> pickLeftApp(), false);
+        col.addView(leftAppButton, full());
+        serviceButton = button("", v -> Ui.start(this, new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)), false);
+        col.addView(serviceButton, full());
+        col.addView(note("Needed so gestures also work while the left app (Fotoo) is open: in Accessibility, "
+                + "turn on \"FrameDash gestures\". It only sees key presses and which app is open."));
+        col.addView(button("Gestures & buttons (teach what each one does)",
+                v -> startActivity(new Intent(this, GestureSetupActivity.class)), true), full());
+        col.addView(button("Sensor details (for troubleshooting)",
+                v -> startActivity(new Intent(this, GestureTestActivity.class)), false), full());
 
         // ---------------------------------------------------------- FrameDash
         section("FrameDash");
@@ -234,6 +235,29 @@ public class SettingsActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        leftAppButton.setText("Left desktop app: " + Desks.leftLabel(this) + "  (tap to change)");
+        serviceButton.setText(GestureService.enabled(this)
+                ? "Gestures in other apps: on ✓" : "Gestures in other apps: off  (tap to turn on)");
+    }
+
+    private void pickLeftApp() {
+        java.util.List<AppEntry> apps = Apps.loadLaunchable(this);
+        String[] names = new String[apps.size() + 1];
+        names[0] = "Automatic (Fotoo)";
+        for (int i = 0; i < apps.size(); i++) names[i + 1] = apps.get(i).label;
+        new AlertDialog.Builder(this)
+                .setTitle("Left desktop app")
+                .setItems(names, (d, which) -> {
+                    String pkg = "";
+                    if (which > 0) {
+                        Intent it = apps.get(which - 1).intent;
+                        pkg = it.getComponent() != null ? it.getComponent().getPackageName()
+                                : it.getPackage() == null ? "" : it.getPackage();
+                    }
+                    Prefs.raw(this).edit().putString("left_app", pkg).apply();
+                    leftAppButton.setText("Left desktop app: " + Desks.leftLabel(this) + "  (tap to change)");
+                })
+                .show();
     }
 
     @Override

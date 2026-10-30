@@ -84,7 +84,7 @@ public class GestureSetupActivity extends BaseActivity implements SensorEventLis
         list.setOrientation(LinearLayout.VERTICAL);
         col.addView(list);
         col.addView(note("Tip: if every direction records the same pattern, this sensor only knows \"hand near\", "
-                + "not which way it moved. Then use a single wave for the action you use most (e.g. Next picture)."));
+                + "not which way it moved. Then use a single wave for the action you use most (e.g. Right desktop)."));
         render();
         watcher = new Bindings.Watcher(this, a -> {
             if (recording == null) banner.setText("✓ " + Bindings.label(a));

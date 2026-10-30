@@ -4,4 +4,5 @@
     <string name="diagnostics">Diagnostics</string>
     <string name="all_apps">All apps</string>
     <string name="android_settings">Android settings</string>
+    <string name="gesture_service_desc">Lets the frame's gestures and buttons switch between Fotoo, the dashboard and art, and brings the dashboard back when someone walks up. FrameDash only sees key presses and which app is open, never what is on the screen.</string>
 </resources>

@@ -46,11 +46,6 @@ final class Prefs {
     static String photoAlbums(Context c) { return p(c).getString("photo_albums", "").trim(); }
     static void setPhotoAlbums(Context c, String v) { p(c).edit().putString("photo_albums", v == null ? "" : v.trim()).apply(); }
 
-    /** What art mode shows: "paintings" or an album's share link. */
-    /** In art mode: true (default) = any gesture, button or movement shows the dashboard; false = gestures change pictures. */
-    static boolean artGesturesWake(Context c) { return p(c).getBoolean("art_gestures_wake", true); }
-    static void setArtGesturesWake(Context c, boolean v) { p(c).edit().putBoolean("art_gestures_wake", v).apply(); }
-
     /** Wake on a shadow over the light sensor: 0 off, 1 low, 2 medium (default), 3 high sensitivity. */
     static int shadowWake(Context c) { return p(c).getInt("shadow_wake", 2); }
     static void setShadowWake(Context c, int v) { p(c).edit().putInt("shadow_wake", v).apply(); }
