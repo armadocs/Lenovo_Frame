@@ -38,7 +38,6 @@ import java.util.List;
  */
 final class Brief {
 
-    static final String DEFAULT_URL = "https://api.github.com/repos/armadocs/daily-brief/contents/brief.json";
 
     static final class Item {
         String id, title, detail, when;
@@ -183,67 +182,17 @@ final class Brief {
     }
 
     static boolean configured(Context c) {
-        return Notion.configured(c) || !Prefs.briefUrl(c).isEmpty();
+        return Notion.configured(c);
     }
 
-    /** Gets the current brief from Notion (if connected) or the brief file. Null = unchanged. */
+    /** Gets the current brief from Notion and keeps a copy for offline use. */
     static Brief load(Context c) throws IOException {
-        if (Notion.configured(c)) {
-            Brief b = Notion.fetch(c);
-            try (FileOutputStream out = new FileOutputStream(cacheFile(c))) {
-                out.write(b.toJson().getBytes("UTF-8"));
-            }
-            return b;
+        if (!Notion.configured(c)) throw new IOException("Notion isn't connected (Settings → Daily brief)");
+        Brief b = Notion.fetch(c);
+        try (FileOutputStream out = new FileOutputStream(cacheFile(c))) {
+            out.write(b.toJson().getBytes("UTF-8"));
         }
-        return fetch(c);
-    }
-
-    /**
-     * Downloads the brief (network: call off the UI thread). Returns the new brief,
-     * or null if it hasn't changed since last time.
-     */
-    static Brief fetch(Context c) throws IOException {
-        String url = Prefs.briefUrl(c);
-        if (url.isEmpty()) throw new IOException("No brief link set (Settings → Daily brief)");
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(20000);
-        conn.setRequestProperty("User-Agent", "FrameDash");
-        conn.setRequestProperty("Cache-Control", "no-cache");
-        if (url.contains("api.github.com")) {
-            conn.setRequestProperty("Accept", "application/vnd.github.raw+json");
-            conn.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
-        }
-        String token = Prefs.briefToken(c);
-        if (!token.isEmpty()) conn.setRequestProperty("Authorization", "Bearer " + token);
-        String etag = Prefs.raw(c).getString("brief_etag", "");
-        if (!etag.isEmpty() && cacheFile(c).exists()) conn.setRequestProperty("If-None-Match", etag);
-        try {
-            int code = conn.getResponseCode();
-            if (code == 304) return null;
-            if (code == 401) throw new IOException("The GitHub key was rejected (401). Check it in Settings.");
-            if (code == 403) throw new IOException("Access denied or rate-limited (403).");
-            if (code == 404) throw new IOException("Brief file not found (404): the file doesn't exist yet, "
-                    + "or the key can't see that repository.");
-            if (code != 200) throw new IOException("Server answered HTTP " + code);
-            byte[] body;
-            try (InputStream in = conn.getInputStream()) {
-                body = readAll(in, 512 * 1024);
-            }
-            String json = new String(body, "UTF-8");
-            Brief b = parse(json); // validate before replacing the cached copy
-            try (FileOutputStream out = new FileOutputStream(cacheFile(c))) {
-                out.write(body);
-            }
-            String newTag = conn.getHeaderField("ETag");
-            Prefs.raw(c).edit()
-                    .putString("brief_etag", newTag == null ? "" : newTag)
-                    .putLong("brief_fetched_at", System.currentTimeMillis())
-                    .apply();
-            return b;
-        } finally {
-            conn.disconnect();
-        }
+        return b;
     }
 
     private static byte[] readAll(InputStream in, int limit) throws IOException {

@@ -20,12 +20,6 @@ final class Prefs {
     static int uiWidthDp(Context c) { return p(c).getInt("ui_width_dp", 540); }
     static void setUiWidthDp(Context c, int v) { p(c).edit().putInt("ui_width_dp", v).apply(); }
 
-    /** Where the daily brief JSON lives, and the read-only key for it (GitHub fine-grained token). */
-    static String briefUrl(Context c) { return p(c).getString("brief_url", "").trim(); }
-    static void setBriefUrl(Context c, String v) { p(c).edit().putString("brief_url", v == null ? "" : v.trim()).apply(); }
-    static String briefToken(Context c) { return p(c).getString("brief_token", "").trim(); }
-    static void setBriefToken(Context c, String v) { p(c).edit().putString("brief_token", v == null ? "" : v.trim()).apply(); }
-
     /** Notion internal-integration key and the "Daily Brief" database id. */
     static String notionToken(Context c) { return p(c).getString("notion_token", "").trim(); }
     static void setNotionToken(Context c, String v) { p(c).edit().putString("notion_token", v == null ? "" : v.trim()).apply(); }

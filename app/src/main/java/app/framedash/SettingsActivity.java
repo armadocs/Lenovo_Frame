@@ -33,8 +33,6 @@ public class SettingsActivity extends BaseActivity {
 
     private LinearLayout col;
     private EditText cityField;
-    private EditText briefUrlField, briefTokenField;
-    private TextView briefStatus;
     private EditText notionField;
     private TextView notionStatus;
     private TextView artIdleButton, artIntervalButton, orientButton, albumsStatus, collectionButton;
@@ -75,48 +73,9 @@ public class SettingsActivity extends BaseActivity {
 
         // ---------------------------------------------------------- Daily brief
         section("Daily brief");
-        col.addView(note("Grok saves the brief as brief.json in your private GitHub repo; the frame reads it "
-                + "every 5 minutes. Paste a read-only GitHub key (fine-grained token with Contents: Read-only "
-                + "on armadocs/daily-brief)."));
-        col.addView(text("Brief file link", 12, false));
-        briefUrlField = new EditText(this);
-        briefUrlField.setSingleLine(true);
-        briefUrlField.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
-        briefUrlField.setTextColor(getColor(R.color.text));
-        String bu = Prefs.briefUrl(this);
-        briefUrlField.setText(bu.isEmpty() ? Brief.DEFAULT_URL : bu);
-        col.addView(briefUrlField);
-        col.addView(text("GitHub read key", 12, false));
-        briefTokenField = new EditText(this);
-        briefTokenField.setSingleLine(true);
-        briefTokenField.setHint("github_pat_…");
-        briefTokenField.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        briefTokenField.setTextColor(getColor(R.color.text));
-        briefTokenField.setHintTextColor(getColor(R.color.text_dim));
-        briefTokenField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        briefTokenField.setTypeface(Typeface.MONOSPACE);
-        briefTokenField.setText(Prefs.briefToken(this));
-        col.addView(briefTokenField);
-        LinearLayout briefRow = row();
-        briefRow.addView(button("Paste key", v -> {
-            String t = clipboardText();
-            int at = t.indexOf("github_pat_");
-            if (at < 0) at = t.indexOf("ghp_");
-            if (at > 0) t = t.substring(at);
-            int sp = t.indexOf(' ');
-            if (sp > 0) t = t.substring(0, sp);
-            briefTokenField.setText(t.trim());
-            saveAndTestBrief();
-        }, true), weighted());
-        briefRow.addView(button("Save & load now", v -> saveAndTestBrief(), true), weighted());
-        col.addView(briefRow);
-        briefStatus = note(Prefs.briefUrl(this).isEmpty() ? "Not connected yet." : "Connected.");
-        col.addView(briefStatus);
-
-        col.addView(text("Notion (shared to-do list, recommended)", 13, true));
-        col.addView(note("When Notion is connected, the frame shows the \"Daily Brief\" database instead of the "
-                + "file, and ticking an item off updates Notion (and so your phone and Grok). Paste the "
-                + "integration key (starts with ntn_), then Connect."));
+        col.addView(note("The frame shows the \"Daily Brief\" database from Notion, and ticking an item off "
+                + "updates Notion (and so your phone and Grok). Paste the integration key (starts with ntn_), "
+                + "then Connect."));
         notionField = new EditText(this);
         notionField.setSingleLine(true);
         notionField.setHint("ntn_…");
@@ -140,7 +99,7 @@ public class SettingsActivity extends BaseActivity {
         notionRow.addView(button("Connect Notion", v -> connectNotion(), true), weighted());
         notionRow.addView(button("Disconnect", v -> {
             Prefs.setNotionDb(this, "");
-            notionStatus.setText("Disconnected. The frame uses the brief file again.");
+            notionStatus.setText("Disconnected.");
         }, false), weighted());
         col.addView(notionRow);
         col.addView(button("Test Notion write (ticks & unticks one item)", v -> testNotionWrite(), false), full());
@@ -282,8 +241,6 @@ public class SettingsActivity extends BaseActivity {
         super.onPause();
         Prefs.setPhotoAlbums(this, albumsField.getText().toString());
         Prefs.setHomeCity(this, cityField.getText().toString());
-        Prefs.setBriefUrl(this, briefUrlField.getText().toString());
-        Prefs.setBriefToken(this, briefTokenField.getText().toString());
         Prefs.setNotionToken(this, notionField.getText().toString());
     }
 
@@ -363,30 +320,6 @@ public class SettingsActivity extends BaseActivity {
         });
     }
 
-    private void saveAndTestBrief() {
-        Prefs.setBriefUrl(this, briefUrlField.getText().toString());
-        Prefs.setBriefToken(this, briefTokenField.getText().toString());
-        Prefs.raw(this).edit().remove("brief_etag").apply();
-        briefStatus.setText("Loading…");
-        final Context app = getApplicationContext();
-        bg.execute(() -> {
-            String msg;
-            try {
-                Brief b = Brief.fetch(app);
-                if (b == null) b = Brief.cached(app);
-                int items = 0;
-                if (b != null) for (Brief.Section sct : b.sections) items += sct.items.size();
-                msg = b == null ? "Nothing loaded." : "✓ Loaded the brief for " + (b.date.isEmpty() ? "?" : b.date)
-                        + ": " + b.sections.size() + " sections, " + items + " items.";
-            } catch (Exception e) {
-                msg = "✗ " + e.getMessage();
-            }
-            final String m = msg;
-            main.post(() -> { if (!isDestroyed()) briefStatus.setText(m); });
-        });
-    }
-
-    @Override
     protected void onDestroy() {
         super.onDestroy();
         bg.shutdownNow();
