@@ -9,7 +9,7 @@ import android.view.WindowManager;
 
 /**
  * Lays every screen out on a fixed virtual canvas (540dp wide by default), so
- * the design looks the same whatever density the fridge panel reports.
+ * the design looks the same whatever density the panel reports.
  */
 public class BaseActivity extends Activity {
 

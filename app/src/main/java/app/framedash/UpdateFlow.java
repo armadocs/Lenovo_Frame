@@ -76,7 +76,7 @@ final class UpdateFlow {
                     hide();
                     if (userAsked) {
                         toast(fError != null ? "Update check failed: " + fError
-                                : "FridgeDash is up to date (v" + Updater.installedVersionName(act) + ")");
+                                : "FrameDash is up to date (v" + Updater.installedVersionName(act) + ")");
                     }
                 }
             });
@@ -99,7 +99,7 @@ final class UpdateFlow {
         if (!Updater.canInstall(act)) {
             new AlertDialog.Builder(act)
                     .setTitle("One-time permission")
-                    .setMessage("Android needs you to allow FridgeDash to install updates.\n\n"
+                    .setMessage("Android needs you to allow FrameDash to install updates.\n\n"
                             + "On the next screen, turn on \"Allow from this source\", "
                             + "press Back, then tap the update notice again.")
                     .setPositiveButton("Open settings", (d, w) -> Ui.start(act, Updater.unknownSourcesSettings(act)))

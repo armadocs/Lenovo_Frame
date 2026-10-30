@@ -75,14 +75,14 @@ final class Weather {
     }
 
     private static Weather fetchInner(Context c) throws Exception {
-        Object[] where = Tools.home(c);
+        Object[] where = Place.home(c);
         if (where == null) throw new java.io.IOException("location unknown");
         String url = "https://api.open-meteo.com/v1/forecast?latitude=" + where[0] + "&longitude=" + where[1]
                 + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,wind_speed_10m"
                 + "&hourly=temperature_2m,weather_code,precipitation_probability,is_day"
                 + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset"
                 + "&timezone=auto&forecast_days=7";
-        JSONObject data = new JSONObject(Tools.get(url));
+        JSONObject data = new JSONObject(Place.get(url));
         long now = System.currentTimeMillis();
         String place = String.valueOf(where[2]);
         Weather w = parse(data, place, now);
@@ -168,7 +168,7 @@ final class Weather {
     }
 
     static String label(int code) {
-        String s = Tools.describe(code);
+        String s = Place.describe(code);
         return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 }

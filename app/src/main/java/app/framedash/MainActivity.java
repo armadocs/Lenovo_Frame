@@ -17,7 +17,7 @@ import android.widget.Toast;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** The home screen: clock, today's brief, and the dock with the ChatGPT button. */
+/** The home screen: clock, weather, today's brief and a row of shortcuts. */
 public class MainActivity extends BaseActivity {
 
     private final ExecutorService bg = Executors.newSingleThreadExecutor();
@@ -83,10 +83,8 @@ public class MainActivity extends BaseActivity {
 
         findViewById(R.id.btnSettings).setOnClickListener(v ->
                 startActivity(new Intent(this, SettingsActivity.class)));
-        findViewById(R.id.dockFridge).setOnClickListener(v -> FridgeHome.open(this));
         findViewById(R.id.dockHome).setOnClickListener(v -> openHomeAssistant());
-        findViewById(R.id.dockTalk).setOnClickListener(v ->
-                startActivity(new Intent(this, VoiceActivity.class)));
+        findViewById(R.id.dockArt).setOnClickListener(v -> showArt());
         findViewById(R.id.dockCalendar).setOnClickListener(v ->
                 Ui.start(this, new Intent(Intent.ACTION_VIEW, Uri.parse("https://calendar.google.com/calendar/r/day"))
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
@@ -109,8 +107,7 @@ public class MainActivity extends BaseActivity {
         gestures = new Bindings.Watcher(this, this::perform);
         cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         watchNetwork();
-        Tools.warmUp(this);                // finds the home city once, for weather questions
-        RemoteMic.get(this).startServer(); // lets a phone be the microphone (Settings → Phone as microphone)
+        Place.warmUp(this); // finds the home city once, for weather
     }
 
     @Override
@@ -178,13 +175,14 @@ public class MainActivity extends BaseActivity {
         switch (action) {
             case Bindings.DASHBOARD:
                 break; // already here
-            case Bindings.CHATGPT:
-                startActivity(new Intent(this, VoiceActivity.class));
-                break;
             default:
-                startActivity(new Intent(this, ArtActivity.class));
-                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+                showArt();
         }
+    }
+
+    private void showArt() {
+        startActivity(new Intent(this, ArtActivity.class));
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
     }
 
     @Override
@@ -378,7 +376,7 @@ public class MainActivity extends BaseActivity {
 
     private void showCredit(String credit) {
         if (credit == null || credit.isEmpty()) {
-            creditText.setText(Prefs.dailyWallpaper(this) ? "Photo of the day loads with Wi-Fi" : "FridgeDash");
+            creditText.setText(Prefs.dailyWallpaper(this) ? "Photo of the day loads with Wi-Fi" : "FrameDash");
         } else {
             // "Title · Place (© Photographer/Agency)": keep it short for the chip.
             int paren = credit.indexOf(" (©");

@@ -49,19 +49,13 @@ public class GestureTestActivity extends BaseActivity implements SensorEventList
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         int pad = Ui.dp(this, 16);
-        col.setPadding(pad, pad, pad, pad);
+        col.setPadding(pad, 0, pad, pad);
         scroll.addView(col);
-        setContentView(scroll);
-
-        TextView title = new TextView(this);
-        title.setText("Gesture test");
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-        title.setTextColor(getColor(R.color.text));
-        col.addView(title);
+        setContentView(Ui.withCloseBar(this, "Sensor details", scroll));
         TextView help = new TextView(this);
         help.setText("Wave your hand in front of the sensor: left→right, right→left, top→bottom, bottom→top, "
                 + "slowly, a few times each, ~10 cm away. Then take a photo of this screen (or several). "
-                + "Back button / Esc closes.");
+                + "Close (top right), Back or Esc closes.");
         help.setTextColor(getColor(R.color.text_dim));
         help.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         help.setPadding(0, Ui.dp(this, 6), 0, Ui.dp(this, 10));

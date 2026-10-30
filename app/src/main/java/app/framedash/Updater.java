@@ -29,7 +29,7 @@ import java.security.MessageDigest;
  *  - Android itself also refuses the update unless it is signed with the
  *    same key as the installed app.
  *
- * No background service: checks only happen while FridgeDash is open.
+ * No background service: checks only happen while FrameDash is open.
  */
 final class Updater {
     private Updater() {}
@@ -108,7 +108,7 @@ final class Updater {
         File dir = new File(ctx.getCacheDir(), "updates");
         //noinspection ResultOfMethodCallIgnored
         dir.mkdirs();
-        return new File(dir, "fridgedash.apk");
+        return new File(dir, "framedash.apk");
     }
 
     /** Network call: run off the UI thread. Returns the verified APK file. */
@@ -151,7 +151,7 @@ final class Updater {
         if (pi == null || !ctx.getPackageName().equals(pi.packageName)) {
             //noinspection ResultOfMethodCallIgnored
             tmp.delete();
-            throw new IOException("Downloaded file is not a FridgeDash APK");
+            throw new IOException("Downloaded file is not a FrameDash APK");
         }
         if (pi.versionCode <= installedVersionCode(ctx)) {
             //noinspection ResultOfMethodCallIgnored
@@ -165,7 +165,7 @@ final class Updater {
         return out;
     }
 
-    /** Android 8+ needs a one-time "Install unknown apps" permission for FridgeDash. */
+    /** Android 8+ needs a one-time "Install unknown apps" permission for FrameDash. */
     static boolean canInstall(Context ctx) {
         return Build.VERSION.SDK_INT < 26 || ctx.getPackageManager().canRequestPackageInstalls();
     }
@@ -194,7 +194,7 @@ final class Updater {
         c.setInstanceFollowRedirects(true); // github.com → release-assets host (both https)
         c.setConnectTimeout(15000);
         c.setReadTimeout(30000);
-        c.setRequestProperty("User-Agent", "FridgeDash-Updater");
+        c.setRequestProperty("User-Agent", "FrameDash-Updater");
         c.setRequestProperty("Cache-Control", "no-cache");
         return c;
     }

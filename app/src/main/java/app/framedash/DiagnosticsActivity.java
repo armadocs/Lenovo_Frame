@@ -47,18 +47,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Read-only probe of the fridge's Android system, plus controls for choosing
- * which Home activity the Refrigerator button opens. Nothing here modifies
- * other apps or system settings.
- */
+/** Read-only probe of this device's Android system. Nothing here modifies other apps or settings. */
 public class DiagnosticsActivity extends BaseActivity {
 
     private static final int REQ_STORAGE = 1;
     private static final int MAX_ACTIVITIES = 60;
 
     private LinearLayout root;
-    private LinearLayout homeSection;
     private TextView reportView;
     private String report = "";
 
@@ -84,11 +79,6 @@ public class DiagnosticsActivity extends BaseActivity {
         actions.addView(button("Back", v -> finish()), weighted());
         root.addView(actions);
 
-        root.addView(text("Refrigerator button", 24, true));
-        homeSection = new LinearLayout(this);
-        homeSection.setOrientation(LinearLayout.VERTICAL);
-        root.addView(homeSection);
-
         root.addView(text("Report", 24, true));
         reportView = text("Collecting…", 15, false);
         reportView.setTypeface(Typeface.MONOSPACE);
@@ -99,63 +89,7 @@ public class DiagnosticsActivity extends BaseActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        buildHomeSection();
         refreshReport();
-    }
-
-    // ---------------------------------------------------------------- home choice
-
-    private void buildHomeSection() {
-        homeSection.removeAllViews();
-        PackageManager pm = getPackageManager();
-        ComponentName target = FridgeHome.resolve(this);
-        ComponentName saved = FridgeHome.saved(this);
-        ComponentName def = FridgeHome.currentDefault(pm);
-
-        homeSection.addView(text("The button currently opens: "
-                + (target == null ? "(nothing found — falls back to the default Home)" : target.flattenToShortString())
-                + (saved != null ? "  [chosen manually]" : "  [automatic]"), 17, false));
-        homeSection.addView(text("Android's default Home app: "
-                + (def == null ? "none selected" : def.flattenToShortString()), 17, false));
-
-        for (ResolveInfo ri : FridgeHome.allHomeActivities(pm)) {
-            final ComponentName cn = new ComponentName(ri.activityInfo.packageName, ri.activityInfo.name);
-            String label = String.valueOf(ri.loadLabel(pm));
-            boolean system = Apps.isSystem(ri.activityInfo.applicationInfo);
-
-            LinearLayout card = new LinearLayout(this);
-            card.setOrientation(LinearLayout.VERTICAL);
-            card.setBackgroundResource(R.drawable.tile);
-            int p = Ui.dp(this, 16);
-            card.setPadding(p, p, p, p);
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            clp.topMargin = Ui.dp(this, 12);
-
-            card.addView(text(label + (system ? "  (system)" : "")
-                    + (cn.equals(target) ? "  ← Refrigerator button" : ""), 19, true));
-            card.addView(text(cn.flattenToShortString(), 15, false));
-
-            LinearLayout r = row();
-            r.addView(button("Test launch", v -> {
-                if (!FridgeHome.launch(this, cn)) {
-                    Toast.makeText(this, "Launch failed", Toast.LENGTH_SHORT).show();
-                }
-            }), weighted());
-            r.addView(button("Use for Refrigerator button", v -> {
-                FridgeHome.save(this, cn);
-                buildHomeSection();
-            }), weighted());
-            card.addView(r);
-            homeSection.addView(card, clp);
-        }
-
-        if (saved != null) {
-            homeSection.addView(button("Reset to automatic choice", v -> {
-                FridgeHome.save(this, null);
-                buildHomeSection();
-            }));
-        }
     }
 
     // ---------------------------------------------------------------- report
@@ -198,7 +132,7 @@ public class DiagnosticsActivity extends BaseActivity {
         String version = "?";
         try { version = pm.getPackageInfo(ctx.getPackageName(), 0).versionName; } catch (Exception ignored) {}
 
-        sb.append("FridgeDash ").append(version).append(" diagnostics\n");
+        sb.append("FrameDash ").append(version).append(" diagnostics\n");
         sb.append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())).append("\n\n");
 
         sb.append("== Device ==\n");
@@ -268,10 +202,8 @@ public class DiagnosticsActivity extends BaseActivity {
         } catch (Exception ignored) {}
         sb.append('\n');
 
-        sb.append("== Audio (for ChatGPT voice) ==\n");
+        sb.append("== Audio ==\n");
         sb.append("Microphone feature: ").append(pm.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)).append('\n');
-        sb.append("Mic permission granted: ").append(ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO)
-                == PackageManager.PERMISSION_GRANTED).append('\n');
         try {
             android.media.AudioManager audio = (android.media.AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
             if (audio != null) {
@@ -287,8 +219,6 @@ public class DiagnosticsActivity extends BaseActivity {
         } catch (Exception e) {
             sb.append("Audio devices: ").append(e.getClass().getSimpleName()).append('\n');
         }
-        sb.append("Bluetooth call-audio device: ").append(BtAudio.headsetConnected(ctx)
-                ? "connected " + BtAudio.headsetName(ctx) : "none").append('\n');
         sb.append("Echo canceller available: ").append(android.media.audiofx.AcousticEchoCanceler.isAvailable()).append('\n');
         sb.append("Noise suppressor available: ").append(android.media.audiofx.NoiseSuppressor.isAvailable()).append('\n');
         sb.append("UI canvas width: ").append(Prefs.uiWidthDp(ctx)).append(" dp\n");
@@ -321,22 +251,21 @@ public class DiagnosticsActivity extends BaseActivity {
         sb.append('\n');
 
         sb.append("== Home screen apps ==\n");
-        ComponentName def = FridgeHome.currentDefault(pm);
-        ComponentName target = FridgeHome.resolve(ctx);
+        Intent hq = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        ResolveInfo defRi = pm.resolveActivity(hq, PackageManager.MATCH_DEFAULT_ONLY);
+        String defPkg = defRi == null || defRi.activityInfo == null ? "" : defRi.activityInfo.packageName;
         Set<String> homePkgs = new LinkedHashSet<>();
-        for (ResolveInfo ri : FridgeHome.allHomeActivities(pm)) {
+        for (ResolveInfo ri : pm.queryIntentActivities(hq, 0)) {
             ComponentName cn = new ComponentName(ri.activityInfo.packageName, ri.activityInfo.name);
             sb.append("- ").append(ri.loadLabel(pm)).append(" | ").append(cn.flattenToShortString())
-                    .append(" | ").append(Apps.isSystem(ri.activityInfo.applicationInfo) ? "system" : "user")
-                    .append(" | prio ").append(ri.priority);
-            if (cn.equals(def)) sb.append(" [DEFAULT]");
-            if (cn.equals(target)) sb.append(" [FRIDGE BUTTON]");
+                    .append(" | ").append(Apps.isSystem(ri.activityInfo.applicationInfo) ? "system" : "user");
+            if (cn.getPackageName().equals(defPkg)) sb.append(" [DEFAULT]");
             sb.append('\n');
-            if (!FridgeHome.isIgnored(ctx, cn.getPackageName())) homePkgs.add(cn.getPackageName());
+            if (!cn.getPackageName().equals(ctx.getPackageName())) homePkgs.add(cn.getPackageName());
         }
         sb.append('\n');
 
-        // Vendor (non-AOSP) system apps: the Hisense originals live here.
+        // Vendor (non-AOSP) system apps: the Lenovo originals live here.
         sb.append("== Vendor system apps ==\n");
         List<String> vendorLines = new ArrayList<>();
         Set<String> keyPkgs = new LinkedHashSet<>(homePkgs);
@@ -348,7 +277,6 @@ public class DiagnosticsActivity extends BaseActivity {
             String label = String.valueOf(ai.loadLabel(pm));
             boolean launchable = pm.getLaunchIntentForPackage(pkg) != null;
             vendorLines.add(label + " | " + pkg + (launchable ? " | launchable" : ""));
-            if (label.equalsIgnoreCase("Refrigerator Control")) keyPkgs.add(pkg);
         }
         final Collator c = Collator.getInstance();
         Collections.sort(vendorLines, c);
@@ -388,11 +316,6 @@ public class DiagnosticsActivity extends BaseActivity {
         for (String l : lines) sb.append("- ").append(l).append('\n');
         sb.append('\n');
 
-        try {
-            sb.append(Probe.run(ctx));
-        } catch (Throwable t) {
-            sb.append("Deep probe failed: ").append(t).append('\n');
-        }
         return sb.toString();
     }
 
@@ -447,7 +370,7 @@ public class DiagnosticsActivity extends BaseActivity {
         try {
             File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
             if (!dir.exists() && !dir.mkdirs()) throw new Exception("can't create " + dir);
-            File f = new File(dir, "fridgedash-report.txt");
+            File f = new File(dir, "framedash-report.txt");
             try (FileOutputStream out = new FileOutputStream(f)) {
                 out.write(report.getBytes(StandardCharsets.UTF_8));
             }
@@ -467,7 +390,7 @@ public class DiagnosticsActivity extends BaseActivity {
             Intent send = new Intent(Intent.ACTION_SEND);
             send.setType("text/plain");
             send.putExtra(Intent.EXTRA_STREAM, ApkProvider.REPORT_URI);
-            send.putExtra(Intent.EXTRA_SUBJECT, "FridgeDash diagnostics");
+            send.putExtra(Intent.EXTRA_SUBJECT, "FrameDash diagnostics");
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             Ui.start(this, Intent.createChooser(send, "Send report").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));
         } catch (Exception e) {

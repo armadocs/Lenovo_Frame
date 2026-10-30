@@ -19,8 +19,8 @@ import java.util.List;
 
 /**
  * The daily brief: a small JSON file that Grok writes (e.g. brief.json in a
- * private GitHub repo) and the fridge reads. Check-offs are stored on the
- * fridge, per brief date.
+ * private GitHub repo) and the frame reads. Check-offs are stored on the
+ * device, per brief date.
  *
  * Format:
  * {
@@ -52,7 +52,7 @@ final class Brief {
     }
 
     String date = "", title = "Daily brief", generatedAt = "";
-    boolean live;   // true = from Notion (check-offs sync), false = from a file (check-offs stay on the fridge)
+    boolean live;   // true = from Notion (check-offs sync), false = from a file (check-offs stay on this frame)
     final List<Section> sections = new ArrayList<>();
 
     // ------------------------------------------------------------------ parsing
@@ -119,7 +119,7 @@ final class Brief {
         return n;
     }
 
-    // ------------------------------------------------------------------ check-offs (on the fridge)
+    // ------------------------------------------------------------------ check-offs (on this frame)
 
     private static SharedPreferences done(Context c) {
         return c.getSharedPreferences("brief_done", Context.MODE_PRIVATE);
@@ -171,7 +171,7 @@ final class Brief {
 
     static File cacheFile(Context c) { return new File(c.getFilesDir(), "brief.json"); }
 
-    /** Last brief saved on the fridge, or null. */
+    /** Last brief saved on this frame, or null. */
     static Brief cached(Context c) {
         File f = cacheFile(c);
         if (!f.exists()) return null;
@@ -208,7 +208,7 @@ final class Brief {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setConnectTimeout(15000);
         conn.setReadTimeout(20000);
-        conn.setRequestProperty("User-Agent", "FridgeDash");
+        conn.setRequestProperty("User-Agent", "FrameDash");
         conn.setRequestProperty("Cache-Control", "no-cache");
         if (url.contains("api.github.com")) {
             conn.setRequestProperty("Accept", "application/vnd.github.raw+json");

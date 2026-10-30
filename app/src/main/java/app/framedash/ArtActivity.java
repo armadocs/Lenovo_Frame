@@ -309,10 +309,6 @@ public class ArtActivity extends BaseActivity implements Presence.Listener {
                 startedAt = 0;
                 wake();
                 break;
-            case Bindings.CHATGPT:
-                startActivity(new android.content.Intent(this, VoiceActivity.class));
-                finish();
-                break;
             default:
                 break; // "Show art": already showing
         }

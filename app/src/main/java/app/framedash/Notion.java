@@ -17,7 +17,7 @@ import java.util.Map;
 /**
  * The shared to-do list lives in a Notion database whose title contains
  * "Daily Brief" (Grok made "Armada Daily Brief"). Grok writes to it; the
- * fridge and phone read it and tick items off.
+ * screens and phones read it and tick items off.
  *
  * Column names are detected, not assumed, so Grok's own layout works:
  * title = the item; a checkbox (Done/Completed…) or a status/select
@@ -165,7 +165,7 @@ final class Notion {
         return "";
     }
 
-    /** Section name → how the fridge shows it. */
+    /** Section name → how the dashboard shows it. */
     static String kindFor(String section) {
         String s = section.toLowerCase(Locale.US);
         if (s.contains("need") || s.contains("action") || s.contains("to do") || s.contains("todo") || s.contains("urgent"))
@@ -244,7 +244,7 @@ final class Notion {
             if (parent == null) {
                 throw new IOException("The key can't see the Daily Brief database or any page. In Notion, open the "
                         + "\"Armada Daily Brief\" database (or the page it's in), tap ··· → Connections → "
-                        + "add \"FridgeDash\", then try again.");
+                        + "add your integration, then try again.");
             }
             JSONObject body = new JSONObject()
                     .put("parent", new JSONObject().put("type", "page_id").put("page_id", parent.getString("id")))
@@ -507,7 +507,7 @@ final class Notion {
                 .method(method, rb)
                 .header("Authorization", "Bearer " + token)
                 .header("Notion-Version", VERSION)
-                .header("User-Agent", "FridgeDash")
+                .header("User-Agent", "FrameDash")
                 .build();
         try (okhttp3.Response r = http().newCall(req).execute()) {
             int code = r.code();
@@ -517,7 +517,7 @@ final class Notion {
                 try { msg = new JSONObject(resp).optString("message", resp); } catch (JSONException ignored) {}
                 if (code == 401) throw new IOException("Notion rejected the key (401). Check it in Settings.");
                 if (code == 404) throw new IOException("Notion can't find it (404). Is the database connected "
-                        + "to the FridgeDash integration? " + msg);
+                        + "to your integration? " + msg);
                 if (code == 429) throw new IOException("Notion rate limit (429), will retry.");
                 throw new IOException("Notion error " + code + ": " + msg);
             }

@@ -24,7 +24,7 @@ import java.util.Locale;
 
 /**
  * Daily wallpaper: Bing's photo of the day in its 1080x1920 portrait version.
- * Downloaded at most once a day and kept on the fridge, so it still shows
+ * Downloaded at most once a day and kept on this frame, so it still shows
  * without Wi-Fi. A bundled landscape is used until the first download.
  */
 final class Wallpaper {
@@ -182,7 +182,7 @@ final class Wallpaper {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(15000);
         c.setReadTimeout(30000);
-        c.setRequestProperty("User-Agent", "FridgeDash");
+        c.setRequestProperty("User-Agent", "FrameDash");
         try {
             int code = c.getResponseCode();
             if (code != 200) throw new IOException("HTTP " + code);

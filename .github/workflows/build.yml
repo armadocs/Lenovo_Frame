@@ -64,8 +64,6 @@ jobs:
           TAG="v${VERSION_NAME}"
           mkdir out
           cp app/build/outputs/apk/release/app-release.apk out/framedash.apk
-          # Same file with a .jpg name, for the fridge's Bluetooth photo transfer.
-          cp out/framedash.apk out/framedash.jpg
           SHA=$(sha256sum out/framedash.apk | cut -d' ' -f1)
           SIZE=$(stat -c %s out/framedash.apk)
           NOTES=$(git log -1 --pretty=%s)
@@ -87,10 +85,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$TAG" out/framedash.apk out/framedash.jpg out/version.json \
+          gh release create "$TAG" out/framedash.apk out/version.json \
             --title "FrameDash ${VERSION_NAME}" \
             --notes "${NOTES}
 
-          On the frame: FrameDash → Update (installs over Wi-Fi).
-          First install / fallback: send fridgedash.jpg to the fridge via Bluetooth (My Apps → Album → +), rename to .apk, install." \
+          On the frame: Settings → Updates (installs over Wi-Fi), or open the APK link in the browser." \
             --latest

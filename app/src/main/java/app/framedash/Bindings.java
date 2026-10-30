@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Buttons and hand gestures you taught FridgeDash (Settings → Gestures & buttons).
+ * Buttons and hand gestures you taught FrameDash (Settings → Gestures & buttons).
  * Three kinds of input can be learned:
  *  - key:    a button / key press (frame buttons, remote, keyboard)
  *  - sensor: a pattern of readings from a sensor (e.g. the frame's gesture sensor)
@@ -29,7 +29,7 @@ final class Bindings {
     private Bindings() {}
 
     static final String NEXT = "next", PREV = "prev", ALBUM_NEXT = "album_next", ALBUM_PREV = "album_prev",
-            DASHBOARD = "dashboard", ART = "art", CHATGPT = "chatgpt";
+            DASHBOARD = "dashboard", ART = "art";
 
     static final String[][] ACTIONS = {
             {NEXT, "Next picture"},
@@ -38,7 +38,6 @@ final class Bindings {
             {ALBUM_PREV, "Previous album"},
             {DASHBOARD, "Show the dashboard"},
             {ART, "Show art / photos"},
-            {CHATGPT, "Ask ChatGPT"},
     };
 
     static String label(String action) {

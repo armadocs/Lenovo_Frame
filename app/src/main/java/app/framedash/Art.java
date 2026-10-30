@@ -44,7 +44,7 @@ final class Art {
     }
 
     private static final long LIST_MAX_AGE = 7L * 24 * 3600 * 1000;
-    private static final String UA = "FridgeDash art mode (personal home display)";
+    private static final String UA = "FrameDash art mode (personal home display)";
     /** Image servers sit behind bot protection that turns away non-browser requests. */
     static final String BROWSER_UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 "
             + "(KHTML, like Gecko) Chrome/120.0 Safari/537.36";

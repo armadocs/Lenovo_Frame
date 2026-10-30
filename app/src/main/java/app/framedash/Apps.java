@@ -24,7 +24,7 @@ final class Apps {
             "io.homeassistant.companion.android"          // Play build
     };
 
-    /** All apps with a launcher icon, sorted by name (excluding FridgeDash itself). */
+    /** All apps with a launcher icon, sorted by name (excluding FrameDash itself). */
     static List<AppEntry> loadLaunchable(Context ctx) {
         PackageManager pm = ctx.getPackageManager();
         Intent q = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
@@ -84,9 +84,6 @@ final class Apps {
         PackageManager pm = ctx.getPackageManager();
         List<AppEntry> out = new ArrayList<>();
 
-        AppEntry fridge = entryForPackage(pm, findPackageByLabel(pm, "Refrigerator Control"), "Fridge controls");
-        if (fridge != null) out.add(fridge);
-
         for (String pkg : PKG_HOME_ASSISTANT) {
             AppEntry ha = entryForPackage(pm, pkg, "Home Assistant");
             if (ha != null) { out.add(ha); break; }
@@ -102,7 +99,7 @@ final class Apps {
     }
 
     private static AppEntry browserEntry(PackageManager pm) {
-        // Whatever Android considers the default browser (FOSS Browser on the fridge).
+        // Whatever Android considers the default browser.
         Intent view = new Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com"));
         ResolveInfo ri = pm.resolveActivity(view, PackageManager.MATCH_DEFAULT_ONLY);
         if (ri == null || ri.activityInfo == null) return null;

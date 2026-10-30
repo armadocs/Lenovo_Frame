@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * "Gestures & buttons": teach FridgeDash what each button or hand gesture should do.
+ * "Gestures & buttons": teach FrameDash what each button or hand gesture should do.
  * Tap Record next to an action, then press the button or make the gesture.
  * When not recording, anything you do is shown at the top, so you can test.
  */
@@ -62,18 +62,12 @@ public class GestureSetupActivity extends BaseActivity implements SensorEventLis
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         int pad = Ui.dp(this, 20);
-        col.setPadding(pad, pad, pad, pad * 2);
+        col.setPadding(pad, 0, pad, pad * 2);
         scroll.addView(col);
-        setContentView(scroll);
-
-        LinearLayout top = new LinearLayout(this);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(text("Gestures & buttons", 20, true), new LinearLayout.LayoutParams(0, -2, 1f));
-        top.addView(button("Close", v -> finish(), false));
-        col.addView(top);
+        setContentView(Ui.withCloseBar(this, "Gestures & buttons", scroll));
         col.addView(note("Tap Record next to an action, then press the button or wave your hand in front of the "
                 + "sensor the way you want to use it (one smooth movement, about 10 cm away). Each input can do one "
-                + "thing. Afterwards, try your gestures: what FridgeDash recognises is shown in the box below."));
+                + "thing. Afterwards, try your gestures: what FrameDash recognises is shown in the box below."));
 
         banner = text("Try a button or gesture to test it.", 14, true);
         banner.setGravity(Gravity.CENTER);

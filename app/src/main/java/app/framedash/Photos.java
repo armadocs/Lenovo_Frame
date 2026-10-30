@@ -22,7 +22,7 @@ import okhttp3.Request;
  * Google Photos shared albums (paste the album's share link in Settings).
  * Reads the album's public web page; new photos added to the album show up
  * within a few hours. Unofficial: if Google changes that page, this stops
- * working until FridgeDash is updated.
+ * working until FrameDash is updated.
  */
 final class Photos {
     private Photos() {}

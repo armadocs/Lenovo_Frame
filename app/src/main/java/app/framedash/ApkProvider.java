@@ -18,13 +18,13 @@ import java.io.FileNotFoundException;
  */
 public class ApkProvider extends ContentProvider {
     static final String AUTHORITY = "app.framedash.apk";
-    static final Uri CONTENT_URI = Uri.parse("content://" + AUTHORITY + "/fridgedash.apk");
+    static final Uri CONTENT_URI = Uri.parse("content://" + AUTHORITY + "/framedash.apk");
     static final String APK_MIME = "application/vnd.android.package-archive";
     /** The diagnostics report, shared as a .txt file (e.g. to a phone over Bluetooth). */
-    static final Uri REPORT_URI = Uri.parse("content://" + AUTHORITY + "/fridgedash-report.txt");
+    static final Uri REPORT_URI = Uri.parse("content://" + AUTHORITY + "/framedash-report.txt");
 
     static File reportFile(android.content.Context c) {
-        return new File(c.getCacheDir(), "fridgedash-report.txt");
+        return new File(c.getCacheDir(), "framedash-report.txt");
     }
 
     private boolean isReport(Uri uri) {
@@ -52,7 +52,7 @@ public class ApkProvider extends ContentProvider {
         boolean rep = isReport(uri);
         File f = rep ? reportFile(getContext()) : file();
         MatrixCursor c = new MatrixCursor(new String[]{OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE});
-        c.addRow(new Object[]{rep ? "fridgedash-report.txt" : "fridgedash.apk", f.length()});
+        c.addRow(new Object[]{rep ? "framedash-report.txt" : "framedash.apk", f.length()});
         return c;
     }
 

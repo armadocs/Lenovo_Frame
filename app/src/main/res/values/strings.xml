@@ -2,8 +2,6 @@
 <resources>
     <string name="app_name">FrameDash</string>
     <string name="diagnostics">Diagnostics</string>
-    <string name="fridge_title">Refrigerator</string>
-    <string name="fridge_subtitle">Back to the Hisense home screen</string>
     <string name="all_apps">All apps</string>
     <string name="android_settings">Android settings</string>
 </resources>
