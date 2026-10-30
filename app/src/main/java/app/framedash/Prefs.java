@@ -57,6 +57,10 @@ final class Prefs {
     static boolean artGesturesWake(Context c) { return p(c).getBoolean("art_gestures_wake", true); }
     static void setArtGesturesWake(Context c, boolean v) { p(c).edit().putBoolean("art_gestures_wake", v).apply(); }
 
+    /** Wake on a shadow over the light sensor: 0 off, 1 low, 2 medium (default), 3 high sensitivity. */
+    static int shadowWake(Context c) { return p(c).getInt("shadow_wake", 2); }
+    static void setShadowWake(Context c, int v) { p(c).edit().putInt("shadow_wake", v).apply(); }
+
     static String artCollection(Context c) { return p(c).getString("art_collection", ""); }
     static void setArtCollection(Context c, String v) { p(c).edit().putString("art_collection", v).apply(); }
 

@@ -232,6 +232,18 @@ public class SettingsActivity extends BaseActivity {
         });
         refreshWake.run();
         col.addView(wakeButton, full());
+        TextView shadowButton = button("", null, false);
+        String[] shadowNames = {"off", "low", "medium", "high"};
+        Runnable refreshShadow = () -> shadowButton.setText("Walk-up detection (light sensor): "
+                + shadowNames[Prefs.shadowWake(this)]);
+        shadowButton.setOnClickListener(v -> {
+            Prefs.setShadowWake(this, (Prefs.shadowWake(this) + 1) % 4);
+            refreshShadow.run();
+        });
+        refreshShadow.run();
+        col.addView(shadowButton, full());
+        col.addView(note("Notices the shadow of someone walking up, from further away than the proximity sensor. "
+                + "Higher reacts sooner but may also react when a lamp is switched off."));
         String sensor = Presence.describe(this);
         int learned = Bindings.boundSensors(this).size();
         col.addView(note("Show the dashboard: someone coming close, any wave or any button ends art mode. "

@@ -25,11 +25,17 @@ final class Presence implements SensorEventListener {
     private final Listener listener;
     private final List<Sensor> registered = new ArrayList<>();
     private final Map<Sensor, String> last = new HashMap<>();
+    private final Sensor light;
+    private float luxBase = Float.NaN;   // slow average of the room's light
+    private long lastShadow;
+    /** What set off the latest "someone near": "proximity", "light" or "gesture sensor". */
+    String lastReason = "";
 
     Presence(Context c, Listener l) {
         ctx = c;
         sm = (SensorManager) c.getSystemService(Context.SENSOR_SERVICE);
         proximity = sm == null ? null : sm.getDefaultSensor(Sensor.TYPE_PROXIMITY);
+        light = sm == null ? null : sm.getDefaultSensor(Sensor.TYPE_LIGHT);
         listener = l;
     }
 
@@ -48,6 +54,7 @@ final class Presence implements SensorEventListener {
         if (sm == null) return;
         if (proximity != null) add(proximity);
         if (gestureSensors) for (Sensor s : Bindings.boundSensors(ctx)) add(s);
+        if (light != null && Prefs.shadowWake(ctx) > 0) add(light);
     }
 
     private void add(Sensor s) {
@@ -60,19 +67,43 @@ final class Presence implements SensorEventListener {
         if (sm != null && !registered.isEmpty()) sm.unregisterListener(this);
         registered.clear();
         last.clear();
+        luxBase = Float.NaN;
     }
 
     @Override
     public void onSensorChanged(SensorEvent e) {
+        if (e.sensor == light) { onLight(e.values[0]); return; }
         String v = Bindings.valueKey(e);
         String before = last.put(e.sensor, v);
         if (before == null || before.equals(v)) return; // first reading is the resting state
         if (e.sensor == proximity) {
             float d = e.values[0];
-            if (d < proximity.getMaximumRange() && d < 5f) listener.onSomeoneNear();
+            if (d < proximity.getMaximumRange() && d < 5f) fire("proximity");
         } else {
-            listener.onSomeoneNear();
+            fire("gesture sensor");
         }
+    }
+
+    /**
+     * Someone walking up casts a shadow on the light sensor next to the screen, from further away
+     * than the proximity sensor reaches. A quick drop below the room's usual level counts as presence.
+     */
+    private void onLight(float lux) {
+        if (Float.isNaN(luxBase)) { luxBase = lux; return; }
+        int level = Prefs.shadowWake(ctx);              // 1 low, 2 medium, 3 high sensitivity
+        float drop = level >= 3 ? 0.15f : level == 2 ? 0.25f : 0.40f;
+        long now = System.currentTimeMillis();
+        if (luxBase >= 3f && lux < luxBase * (1f - drop) && now - lastShadow > 3000) {
+            lastShadow = now;
+            fire("light");
+        }
+        // Follow the room slowly (lamps, daylight) but not the quick dip of a passing shadow.
+        luxBase += (lux - luxBase) * (lux < luxBase ? 0.05f : 0.3f);
+    }
+
+    private void fire(String reason) {
+        lastReason = reason;
+        listener.onSomeoneNear();
     }
 
     @Override public void onAccuracyChanged(Sensor s, int a) {}

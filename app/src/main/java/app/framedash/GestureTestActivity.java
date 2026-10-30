@@ -99,6 +99,7 @@ public class GestureTestActivity extends BaseActivity implements SensorEventList
         String prox = Presence.describe(this);
         head.append(prox.isEmpty() ? "no proximity sensor" : "proximity (" + prox + ")");
         for (Sensor s : Bindings.boundSensors(this)) head.append(" + ").append(s.getName());
+        if (Prefs.shadowWake(this) > 0) head.append(" + light (walk-up shadow)");
         head.append("\n\nEVENTS (newest first)\n");
         lines.append(head);
         log.setText(lines);
@@ -119,7 +120,7 @@ public class GestureTestActivity extends BaseActivity implements SensorEventList
     protected void onResume() {
         super.onResume();
         if (presence == null) {
-            presence = new Presence(this, () -> add("★ PRESENCE: someone noticed → art mode would show the dashboard"));
+            presence = new Presence(this, () -> add("★ PRESENCE (" + presence.lastReason + "): art mode would show the dashboard"));
             watcher = new Bindings.Watcher(this, a -> add("★ GESTURE (sensor): " + Bindings.label(a)));
         }
         presence.start(true);
