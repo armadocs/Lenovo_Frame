@@ -160,16 +160,33 @@ final class Bindings {
     // ------------------------------------------------------------------ matching
 
     static String actionForKey(Context c, KeyEvent e) {
+        int got = normalize(e.getKeyCode());
         JSONObject a = all(c);
         Iterator<String> it = a.keys();
         while (it.hasNext()) {
             String k = it.next();
             JSONObject b = a.optJSONObject(k);
             if (b == null || !"key".equals(b.optString("type"))) continue;
-            int code = b.optInt("code");
-            if (code == e.getKeyCode() && (code != KeyEvent.KEYCODE_UNKNOWN || b.optInt("scan") == e.getScanCode())) return k;
+            int code = normalize(b.optInt("code"));
+            if (code == got && (code != KeyEvent.KEYCODE_UNKNOWN || b.optInt("scan") == e.getScanCode())) return k;
         }
         return null;
+    }
+
+    /**
+     * The Lenovo frame sends its hand gestures as KEYCODE_GESTURE_DIR_LEFT/RIGHT/UP/DOWN. Apps get
+     * them as the matching arrow keys, but the gesture service sees the raw codes, so treat both alike.
+     */
+    static int normalize(int code) {
+        String n = KeyEvent.keyCodeToString(code);
+        if (n == null || !n.startsWith("KEYCODE_GESTURE_DIR_")) return code;
+        switch (n.substring("KEYCODE_GESTURE_DIR_".length())) {
+            case "LEFT": return KeyEvent.KEYCODE_DPAD_LEFT;
+            case "RIGHT": return KeyEvent.KEYCODE_DPAD_RIGHT;
+            case "UP": return KeyEvent.KEYCODE_DPAD_UP;
+            case "DOWN": return KeyEvent.KEYCODE_DPAD_DOWN;
+            default: return code;
+        }
     }
 
     static String actionForMotion(Context c, MotionEvent e, String dir) {

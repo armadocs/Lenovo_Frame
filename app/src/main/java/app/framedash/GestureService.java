@@ -73,6 +73,7 @@ public class GestureService extends AccessibilityService {
         }
         if (front.isEmpty() || front.equals(getPackageName())) return false;
         String a = Bindings.actionForKey(this, e);
+        if (e.getAction() == KeyEvent.ACTION_DOWN) log("  → " + (a == null ? "not assigned, left to the app" : Bindings.label(a)));
         if (a == null || Bindings.UP.equals(a) || Bindings.DOWN.equals(a)) return false; // up/down: the app's own
         if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) {
             if (Bindings.GO_LEFT.equals(a)) Desks.left(this);
