@@ -12,16 +12,30 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      FRIDGEDASH_KEYSTORE_PASSWORD: ${{ secrets.FRIDGEDASH_KEYSTORE_PASSWORD }}
+      FRAMEDASH_KEYSTORE_PASSWORD: ${{ secrets.FRAMEDASH_KEYSTORE_PASSWORD }}
     steps:
       - name: Check signing secret
         run: |
-          if [ -z "$FRIDGEDASH_KEYSTORE_PASSWORD" ]; then
-            echo "::error::Missing secret FRIDGEDASH_KEYSTORE_PASSWORD (Settings → Secrets and variables → Actions)."
+          if [ -z "$FRAMEDASH_KEYSTORE_PASSWORD" ]; then
+            echo "::error::Missing secret FRAMEDASH_KEYSTORE_PASSWORD (Settings → Secrets and variables → Actions)."
             exit 1
           fi
 
       - uses: actions/checkout@v4
+
+      - name: Create signing key on first run
+        run: |
+          if [ ! -f app/framedash.keystore ]; then
+            keytool -genkeypair -keystore app/framedash.keystore -storetype PKCS12 \
+              -alias framedash -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$FRAMEDASH_KEYSTORE_PASSWORD" -keypass "$FRAMEDASH_KEYSTORE_PASSWORD" \
+              -dname "CN=FrameDash"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app/framedash.keystore
+            git commit -m "Add FrameDash signing key (password-protected) [skip ci]"
+            git push
+          fi
 
       - uses: actions/setup-java@v4
         with:
