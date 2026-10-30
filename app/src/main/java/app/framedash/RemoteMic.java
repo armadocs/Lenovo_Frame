@@ -41,7 +41,7 @@ import java.util.concurrent.TimeUnit;
 final class RemoteMic {
 
     static final int PORT = 47800;
-    static final String SERVICE_TYPE = "_fridgedash-mic._tcp.";
+    static final String SERVICE_TYPE = "_framedash-mic._tcp.";
     private static final int MAX_QUEUE = 30; // ~3 s of audio; older audio is dropped
 
     private static RemoteMic instance;
