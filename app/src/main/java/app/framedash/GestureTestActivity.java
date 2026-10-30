@@ -100,7 +100,13 @@ public class GestureTestActivity extends BaseActivity implements SensorEventList
         head.append(prox.isEmpty() ? "no proximity sensor" : "proximity (" + prox + ")");
         for (Sensor s : Bindings.boundSensors(this)) head.append(" + ").append(s.getName());
         if (Prefs.shadowWake(this) > 0) head.append(" + light (walk-up shadow)");
-        head.append("\n\nEVENTS (newest first)\n");
+        head.append("\n\nGESTURE SERVICE (other apps): ").append(GestureService.connected ? "running" : "NOT running")
+                .append(" — newest first\n");
+        synchronized (GestureService.class) {
+            if (GestureService.LOG.isEmpty()) head.append("(nothing yet)\n");
+            for (String l : GestureService.LOG) head.append("  ").append(l).append('\n');
+        }
+        head.append("\nEVENTS (newest first)\n");
         lines.append(head);
         log.setText(lines);
     }

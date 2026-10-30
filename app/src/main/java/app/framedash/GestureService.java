@@ -16,6 +16,15 @@ import android.view.accessibility.AccessibilityEvent;
 public class GestureService extends AccessibilityService {
 
     private String front = "";
+
+    /** Recent things the service saw, shown in Sensor details (newest first). */
+    static final java.util.LinkedList<String> LOG = new java.util.LinkedList<>();
+    static volatile boolean connected;
+
+    static synchronized void log(String s) {
+        LOG.addFirst(new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(new java.util.Date()) + "  " + s);
+        while (LOG.size() > 40) LOG.removeLast();
+    }
     private Presence presence;
 
     static boolean enabled(Context c) {
@@ -32,6 +41,8 @@ public class GestureService extends AccessibilityService {
             info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
             setServiceInfo(info);
         }
+        connected = true;
+        log("service connected");
         presence = new Presence(this, this::someoneNear);
         presence.start(true);
     }
@@ -39,6 +50,7 @@ public class GestureService extends AccessibilityService {
     @Override
     public void onDestroy() {
         if (presence != null) presence.stop();
+        connected = false;
         super.onDestroy();
     }
 
@@ -47,6 +59,7 @@ public class GestureService extends AccessibilityService {
         if (e.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || e.getPackageName() == null) return;
         String pkg = e.getPackageName().toString();
         if (pkg.equals("com.android.systemui")) return;
+        if (!pkg.equals(front)) log("front app: " + pkg);
         front = pkg;
         String left = Desks.leftPackage(this);
         if (!left.isEmpty() && pkg.equals(left)) Desks.current = Desks.LEFT_APP;
@@ -55,6 +68,9 @@ public class GestureService extends AccessibilityService {
     /** Our own screens handle keys themselves; here we only act while another app is in front. */
     @Override
     protected boolean onKeyEvent(KeyEvent e) {
+        if (e.getAction() == KeyEvent.ACTION_DOWN) {
+            log("key " + KeyEvent.keyCodeToString(e.getKeyCode()) + " in " + (front.isEmpty() ? "?" : front));
+        }
         if (front.isEmpty() || front.equals(getPackageName())) return false;
         String a = Bindings.actionForKey(this, e);
         if (a == null || Bindings.UP.equals(a) || Bindings.DOWN.equals(a)) return false; // up/down: the app's own
@@ -69,6 +85,7 @@ public class GestureService extends AccessibilityService {
     private void someoneNear() {
         // Only for other apps; FrameDash's own screens watch the sensors themselves.
         if (front.isEmpty() || front.equals(getPackageName())) return;
+        log("someone near (" + presence.lastReason + ") in " + front);
         if (Desks.current == Desks.LEFT_APP && Desks.presenceShouldReturn(this)) Desks.show(this, Desks.DASHBOARD);
     }
 
