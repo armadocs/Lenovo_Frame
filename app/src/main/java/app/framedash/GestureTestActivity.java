@@ -30,6 +30,11 @@ public class GestureTestActivity extends BaseActivity implements SensorEventList
 
     private SensorManager sm;
     private TextView log;
+    private Presence presence;
+    private Bindings.Watcher watcher;
+    private final java.util.List<android.database.ContentObserver> observers = new java.util.ArrayList<>();
+    private final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
+    private android.content.BroadcastReceiver screenRx;
     private final StringBuilder lines = new StringBuilder();
     private final Map<Sensor, String> last = new HashMap<>();
     private float lastLux = Float.NaN;
@@ -53,9 +58,10 @@ public class GestureTestActivity extends BaseActivity implements SensorEventList
         scroll.addView(col);
         setContentView(Ui.withCloseBar(this, "Sensor details", scroll));
         TextView help = new TextView(this);
-        help.setText("Wave your hand in front of the sensor: left→right, right→left, top→bottom, bottom→top, "
-                + "slowly, a few times each, ~10 cm away. Then take a photo of this screen (or several). "
-                + "Close (top right), Back or Esc closes.");
+        help.setText("1) Step back about 2 m, wait 5 s, then walk up to the frame WITHOUT waving and stand still. "
+                + "2) Then wave a few times. Lines marked ★ show what FrameDash would do: ★ PRESENCE = someone "
+                + "noticed (art mode would show the dashboard), ★ GESTURE = a learned gesture or button. "
+                + "Take a photo of this screen afterwards. Close (top right), Back or Esc closes.");
         help.setTextColor(getColor(R.color.text_dim));
         help.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
         help.setPadding(0, Ui.dp(this, 6), 0, Ui.dp(this, 10));
@@ -89,7 +95,11 @@ public class GestureTestActivity extends BaseActivity implements SensorEventList
         } catch (Exception e) {
             head.append("(couldn't list: ").append(e.getMessage()).append(")\n");
         }
-        head.append("\nEVENTS (newest first)\n");
+        head.append("\nWATCHED FOR PRESENCE: ");
+        String prox = Presence.describe(this);
+        head.append(prox.isEmpty() ? "no proximity sensor" : "proximity (" + prox + ")");
+        for (Sensor s : Bindings.boundSensors(this)) head.append(" + ").append(s.getName());
+        head.append("\n\nEVENTS (newest first)\n");
         lines.append(head);
         log.setText(lines);
     }
@@ -108,6 +118,25 @@ public class GestureTestActivity extends BaseActivity implements SensorEventList
     @Override
     protected void onResume() {
         super.onResume();
+        if (presence == null) {
+            presence = new Presence(this, () -> add("★ PRESENCE: someone noticed → art mode would show the dashboard"));
+            watcher = new Bindings.Watcher(this, a -> add("★ GESTURE (sensor): " + Bindings.label(a)));
+        }
+        presence.start(true);
+        watcher.start();
+        watchSettings();
+        screenRx = new android.content.BroadcastReceiver() {
+            @Override public void onReceive(android.content.Context c, android.content.Intent i) {
+                add("SYSTEM " + i.getAction());
+            }
+        };
+        android.content.IntentFilter f = new android.content.IntentFilter();
+        f.addAction(android.content.Intent.ACTION_SCREEN_ON);
+        f.addAction(android.content.Intent.ACTION_SCREEN_OFF);
+        f.addAction(android.content.Intent.ACTION_USER_PRESENT);
+        f.addAction(android.content.Intent.ACTION_DREAMING_STARTED);
+        f.addAction(android.content.Intent.ACTION_DREAMING_STOPPED);
+        registerReceiver(screenRx, f);
         if (sm == null) return;
         outer:
         for (Sensor s : sm.getSensorList(Sensor.TYPE_ALL)) {
@@ -120,6 +149,39 @@ public class GestureTestActivity extends BaseActivity implements SensorEventList
     protected void onPause() {
         super.onPause();
         if (sm != null) sm.unregisterListener(this);
+        if (presence != null) presence.stop();
+        if (watcher != null) watcher.stop();
+        for (android.database.ContentObserver o : observers) getContentResolver().unregisterContentObserver(o);
+        observers.clear();
+        if (screenRx != null) { try { unregisterReceiver(screenRx); } catch (Exception ignored) {} screenRx = null; }
+    }
+
+    /** Lenovo's own "someone walked up" logic may flip a system setting; log any setting that changes (read-only). */
+    private void watchSettings() {
+        android.net.Uri[] roots = {android.provider.Settings.System.CONTENT_URI,
+                android.provider.Settings.Secure.CONTENT_URI, android.provider.Settings.Global.CONTENT_URI};
+        for (android.net.Uri root : roots) {
+            android.database.ContentObserver o = new android.database.ContentObserver(ui) {
+                @Override public void onChange(boolean self, android.net.Uri uri) {
+                    String table = uri == null ? "?" : uri.getPathSegments().isEmpty() ? "?" : uri.getPathSegments().get(0);
+                    String name = uri == null ? "?" : uri.getLastPathSegment();
+                    String val = "?";
+                    try {
+                        android.content.ContentResolver cr = getContentResolver();
+                        if ("system".equals(table)) val = android.provider.Settings.System.getString(cr, name);
+                        else if ("secure".equals(table)) val = android.provider.Settings.Secure.getString(cr, name);
+                        else if ("global".equals(table)) val = android.provider.Settings.Global.getString(cr, name);
+                    } catch (Exception ignored) {}
+                    add("SETTING " + table + "/" + name + " = " + val);
+                }
+            };
+            try {
+                getContentResolver().registerContentObserver(root, true, o);
+                observers.add(o);
+            } catch (Exception e) {
+                add("can't watch " + root + ": " + e.getClass().getSimpleName());
+            }
+        }
     }
 
     private void add(String s) {
@@ -158,6 +220,8 @@ public class GestureTestActivity extends BaseActivity implements SensorEventList
         if (e.getKeyCode() == KeyEvent.KEYCODE_BACK || e.getKeyCode() == KeyEvent.KEYCODE_ESCAPE) {
             return super.dispatchKeyEvent(e);
         }
+        String bound = Bindings.actionForKey(this, e);
+        if (bound != null && e.getAction() == KeyEvent.ACTION_DOWN) add("★ GESTURE (key): " + Bindings.label(bound));
         add("KEY " + (e.getAction() == KeyEvent.ACTION_DOWN ? "down " : "up ")
                 + KeyEvent.keyCodeToString(e.getKeyCode()) + " scan=" + e.getScanCode()
                 + " dev=" + (e.getDevice() == null ? "?" : e.getDevice().getName()));
