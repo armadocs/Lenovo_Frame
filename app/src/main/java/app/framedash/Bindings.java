@@ -172,6 +172,23 @@ final class Bindings {
     }
 
     /** Is a learned gesture using this kind of sensor? (Then it shouldn't also wake the screen.) */
+    /** Every sensor that a learned gesture listens to (e.g. the frame's gesture sensor). */
+    static java.util.List<Sensor> boundSensors(Context c) {
+        java.util.List<Sensor> out = new ArrayList<>();
+        SensorManager sm = (SensorManager) c.getSystemService(Context.SENSOR_SERVICE);
+        if (sm == null) return out;
+        JSONObject a = all(c);
+        Iterator<String> it = a.keys();
+        while (it.hasNext()) {
+            JSONObject b = a.optJSONObject(it.next());
+            if (b == null || !"sensor".equals(b.optString("type"))) continue;
+            for (Sensor s : sm.getSensorList(b.optInt("stype"))) {
+                if (s.getName().equals(b.optString("sensor")) && !out.contains(s)) out.add(s);
+            }
+        }
+        return out;
+    }
+
     static boolean usesSensorType(Context c, int type) {
         JSONObject a = all(c);
         Iterator<String> it = a.keys();

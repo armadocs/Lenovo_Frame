@@ -101,9 +101,14 @@ public class ArtActivity extends BaseActivity implements Presence.Listener {
     protected void onResume() {
         super.onResume();
         startedAt = System.currentTimeMillis();
-        // If the proximity sensor carries learned gestures, waving shouldn't also close art mode.
-        if (!Bindings.usesSensorType(this, android.hardware.Sensor.TYPE_PROXIMITY)) presence.start();
-        gestures.start();
+        if (Prefs.artGesturesWake(this)) {
+            // Anyone walking up, waving or pressing a button brings the dashboard back.
+            presence.start(true);
+        } else {
+            // Gestures change pictures; the proximity sensor still wakes unless it carries those gestures.
+            if (!Bindings.usesSensorType(this, android.hardware.Sensor.TYPE_PROXIMITY)) presence.start();
+            gestures.start();
+        }
         main.removeCallbacks(rotate);
         main.post(rotate);
     }
@@ -252,13 +257,17 @@ public class ArtActivity extends BaseActivity implements Presence.Listener {
 
     @Override
     public void onSomeoneNear() {
-        if (System.currentTimeMillis() - startedAt > 3000) wake(); // ignore the sensor's first reading
+        if (System.currentTimeMillis() - startedAt > 2000) wake(); // ignore the moments right after it opened
     }
 
     @Override public boolean dispatchTouchEvent(MotionEvent ev) { wake(); return true; }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent ev) {
+        if (Prefs.artGesturesWake(this)) {
+            if (ev.getAction() == KeyEvent.ACTION_DOWN) { startedAt = 0; wake(); }
+            return true;
+        }
         String bound = Bindings.actionForKey(this, ev);
         if (bound != null) {
             if (ev.getAction() == KeyEvent.ACTION_DOWN && ev.getRepeatCount() == 0) perform(bound);
@@ -316,6 +325,10 @@ public class ArtActivity extends BaseActivity implements Presence.Listener {
 
     @Override
     public boolean dispatchGenericMotionEvent(MotionEvent ev) {
+        if (Prefs.artGesturesWake(this)) {
+            if (System.currentTimeMillis() - startedAt > 1500) wake();
+            return true;
+        }
         String dir = Bindings.motionDir(ev);
         String bound = dir == null ? null : Bindings.actionForMotion(this, ev, dir);
         if (bound != null) { perform(bound); return true; }

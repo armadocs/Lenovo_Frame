@@ -222,10 +222,23 @@ public class SettingsActivity extends BaseActivity {
                 v -> startActivity(new Intent(this, GestureSetupActivity.class)), true), full());
         col.addView(button("Sensor details (for troubleshooting)",
                 v -> startActivity(new Intent(this, GestureTestActivity.class)), false), full());
+        TextView wakeButton = button("", null, false);
+        Runnable refreshWake = () -> wakeButton.setText(Prefs.artGesturesWake(this)
+                ? "In art mode, gestures & buttons: show the dashboard"
+                : "In art mode, gestures & buttons: change pictures / albums");
+        wakeButton.setOnClickListener(v -> {
+            Prefs.setArtGesturesWake(this, !Prefs.artGesturesWake(this));
+            refreshWake.run();
+        });
+        refreshWake.run();
+        col.addView(wakeButton, full());
         String sensor = Presence.describe(this);
-        col.addView(note(sensor.isEmpty()
-                ? "No proximity sensor found on this device: touch, a key or the mouse wakes the dashboard."
-                : "Proximity sensor found (" + sensor + "): coming close wakes the dashboard."));
+        int learned = Bindings.boundSensors(this).size();
+        col.addView(note("Show the dashboard: someone coming close, any wave or any button ends art mode. "
+                + "Change pictures: your gestures flip pictures and albums instead. Sensors watched: "
+                + (sensor.isEmpty() ? "" : "proximity (" + sensor + ")")
+                + (learned > 0 ? (sensor.isEmpty() ? "" : " + ") + learned + " gesture sensor(s)" : "")
+                + (sensor.isEmpty() && learned == 0 ? "none yet (record a gesture first)" : "") + "."));
         refreshArt();
 
         // ---------------------------------------------------------- FrameDash

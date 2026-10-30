@@ -132,7 +132,7 @@ public class MainActivity extends BaseActivity {
         main.removeCallbacks(idleCheck);
         gestures.start();
         if (art) {
-            presence.start();
+            presence.start(true); // someone near or waving keeps the dashboard up
             main.postDelayed(idleCheck, 10_000);
         }
     }

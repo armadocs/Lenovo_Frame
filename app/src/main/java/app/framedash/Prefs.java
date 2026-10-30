@@ -53,6 +53,10 @@ final class Prefs {
     static void setPhotoAlbums(Context c, String v) { p(c).edit().putString("photo_albums", v == null ? "" : v.trim()).apply(); }
 
     /** What art mode shows: "paintings" or an album's share link. */
+    /** In art mode: true (default) = any gesture, button or movement shows the dashboard; false = gestures change pictures. */
+    static boolean artGesturesWake(Context c) { return p(c).getBoolean("art_gestures_wake", true); }
+    static void setArtGesturesWake(Context c, boolean v) { p(c).edit().putBoolean("art_gestures_wake", v).apply(); }
+
     static String artCollection(Context c) { return p(c).getString("art_collection", ""); }
     static void setArtCollection(Context c, String v) { p(c).edit().putString("art_collection", v).apply(); }
 
